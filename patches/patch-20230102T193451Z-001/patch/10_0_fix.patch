@@ -1,0 +1,182 @@
+Index: src/main/java/ru/javawebinar/topjava/AuthorizedUser.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javawebinar/topjava/AuthorizedUser.java b/src/main/java/ru/javawebinar/topjava/AuthorizedUser.java
+--- a/src/main/java/ru/javawebinar/topjava/AuthorizedUser.java	(revision 7141d42dd0ddda9a2e65dff83dff7d307cb6eedb)
++++ b/src/main/java/ru/javawebinar/topjava/AuthorizedUser.java	(revision bec2976ee302a1db100e77ac9ed66c9b61e0132a)
+@@ -2,7 +2,7 @@
+ 
+ import ru.javawebinar.topjava.model.User;
+ import ru.javawebinar.topjava.to.UserTo;
+-import ru.javawebinar.topjava.util.UserUtil;
++import ru.javawebinar.topjava.util.UsersUtil;
+ 
+ import java.io.Serial;
+ 
+@@ -14,7 +14,7 @@
+ 
+     public AuthorizedUser(User user) {
+         super(user.getEmail(), user.getPassword(), user.isEnabled(), true, true, true, user.getRoles());
+-        this.userTo = UserUtil.asTo(user);
++        this.userTo = UsersUtil.asTo(user);
+     }
+ 
+     public int getId() {
+Index: src/main/java/ru/javawebinar/topjava/model/AbstractBaseEntity.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javawebinar/topjava/model/AbstractBaseEntity.java b/src/main/java/ru/javawebinar/topjava/model/AbstractBaseEntity.java
+--- a/src/main/java/ru/javawebinar/topjava/model/AbstractBaseEntity.java	(revision 7141d42dd0ddda9a2e65dff83dff7d307cb6eedb)
++++ b/src/main/java/ru/javawebinar/topjava/model/AbstractBaseEntity.java	(revision bec2976ee302a1db100e77ac9ed66c9b61e0132a)
+@@ -1,7 +1,6 @@
+ package ru.javawebinar.topjava.model;
+ 
+ import org.hibernate.Hibernate;
+-import org.springframework.util.Assert;
+ import ru.javawebinar.topjava.HasId;
+ 
+ import javax.persistence.*;
+Index: src/main/java/ru/javawebinar/topjava/model/User.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javawebinar/topjava/model/User.java b/src/main/java/ru/javawebinar/topjava/model/User.java
+--- a/src/main/java/ru/javawebinar/topjava/model/User.java	(revision 7141d42dd0ddda9a2e65dff83dff7d307cb6eedb)
++++ b/src/main/java/ru/javawebinar/topjava/model/User.java	(revision bec2976ee302a1db100e77ac9ed66c9b61e0132a)
+@@ -18,7 +18,7 @@
+ import javax.validation.constraints.Size;
+ import java.util.*;
+ 
+-import static ru.javawebinar.topjava.util.UserUtil.DEFAULT_CALORIES_PER_DAY;
++import static ru.javawebinar.topjava.util.UsersUtil.DEFAULT_CALORIES_PER_DAY;
+ 
+ @Cache(usage = CacheConcurrencyStrategy.NONSTRICT_READ_WRITE)
+ @NamedQueries({
+Index: src/main/java/ru/javawebinar/topjava/service/UserService.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javawebinar/topjava/service/UserService.java b/src/main/java/ru/javawebinar/topjava/service/UserService.java
+--- a/src/main/java/ru/javawebinar/topjava/service/UserService.java	(revision 7141d42dd0ddda9a2e65dff83dff7d307cb6eedb)
++++ b/src/main/java/ru/javawebinar/topjava/service/UserService.java	(revision bec2976ee302a1db100e77ac9ed66c9b61e0132a)
+@@ -13,7 +13,7 @@
+ import ru.javawebinar.topjava.model.User;
+ import ru.javawebinar.topjava.repository.UserRepository;
+ import ru.javawebinar.topjava.to.UserTo;
+-import ru.javawebinar.topjava.util.UserUtil;
++import ru.javawebinar.topjava.util.UsersUtil;
+ 
+ import java.util.List;
+ 
+@@ -66,7 +66,7 @@
+     @Transactional
+     public void update(UserTo userTo) {
+         User user = get(userTo.id());
+-        User updatedUser = UserUtil.updateFromTo(user, userTo);
++        User updatedUser = UsersUtil.updateFromTo(user, userTo);
+         repository.save(updatedUser);   // !! need only for JDBC implementation
+     }
+ 
+Index: src/main/java/ru/javawebinar/topjava/to/UserTo.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javawebinar/topjava/to/UserTo.java b/src/main/java/ru/javawebinar/topjava/to/UserTo.java
+--- a/src/main/java/ru/javawebinar/topjava/to/UserTo.java	(revision 7141d42dd0ddda9a2e65dff83dff7d307cb6eedb)
++++ b/src/main/java/ru/javawebinar/topjava/to/UserTo.java	(revision bec2976ee302a1db100e77ac9ed66c9b61e0132a)
+@@ -1,7 +1,7 @@
+ package ru.javawebinar.topjava.to;
+ 
+ import org.hibernate.validator.constraints.Range;
+-import ru.javawebinar.topjava.util.UserUtil;
++import ru.javawebinar.topjava.util.UsersUtil;
+ 
+ import javax.validation.constraints.Email;
+ import javax.validation.constraints.NotBlank;
+@@ -29,7 +29,7 @@
+ 
+     @Range(min = 10, max = 10000)
+     @NotNull
+-    private Integer caloriesPerDay = UserUtil.DEFAULT_CALORIES_PER_DAY;
++    private Integer caloriesPerDay = UsersUtil.DEFAULT_CALORIES_PER_DAY;
+ 
+     public UserTo() {
+     }
+Index: src/main/java/ru/javawebinar/topjava/util/UserUtil.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javawebinar/topjava/util/UserUtil.java b/src/main/java/ru/javawebinar/topjava/util/UsersUtil.java
+rename from src/main/java/ru/javawebinar/topjava/util/UserUtil.java
+rename to src/main/java/ru/javawebinar/topjava/util/UsersUtil.java
+--- a/src/main/java/ru/javawebinar/topjava/util/UserUtil.java	(revision 7141d42dd0ddda9a2e65dff83dff7d307cb6eedb)
++++ b/src/main/java/ru/javawebinar/topjava/util/UsersUtil.java	(revision bec2976ee302a1db100e77ac9ed66c9b61e0132a)
+@@ -4,7 +4,7 @@
+ import ru.javawebinar.topjava.model.User;
+ import ru.javawebinar.topjava.to.UserTo;
+ 
+-public class UserUtil {
++public class UsersUtil {
+ 
+     public static final int DEFAULT_CALORIES_PER_DAY = 2000;
+ 
+Index: src/main/java/ru/javawebinar/topjava/web/user/AbstractUserController.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javawebinar/topjava/web/user/AbstractUserController.java b/src/main/java/ru/javawebinar/topjava/web/user/AbstractUserController.java
+--- a/src/main/java/ru/javawebinar/topjava/web/user/AbstractUserController.java	(revision 7141d42dd0ddda9a2e65dff83dff7d307cb6eedb)
++++ b/src/main/java/ru/javawebinar/topjava/web/user/AbstractUserController.java	(revision bec2976ee302a1db100e77ac9ed66c9b61e0132a)
+@@ -6,7 +6,7 @@
+ import ru.javawebinar.topjava.model.User;
+ import ru.javawebinar.topjava.service.UserService;
+ import ru.javawebinar.topjava.to.UserTo;
+-import ru.javawebinar.topjava.util.UserUtil;
++import ru.javawebinar.topjava.util.UsersUtil;
+ 
+ import java.util.List;
+ 
+@@ -32,7 +32,7 @@
+     public void create(UserTo userTo) {
+         log.info("create {}", userTo);
+         checkNew(userTo);
+-        service.create(UserUtil.createNewFromTo(userTo));
++        service.create(UsersUtil.createNewFromTo(userTo));
+     }
+ 
+     public User create(User user) {
+Index: src/test/java/ru/javawebinar/topjava/web/user/ProfileRestControllerTest.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/test/java/ru/javawebinar/topjava/web/user/ProfileRestControllerTest.java b/src/test/java/ru/javawebinar/topjava/web/user/ProfileRestControllerTest.java
+--- a/src/test/java/ru/javawebinar/topjava/web/user/ProfileRestControllerTest.java	(revision 7141d42dd0ddda9a2e65dff83dff7d307cb6eedb)
++++ b/src/test/java/ru/javawebinar/topjava/web/user/ProfileRestControllerTest.java	(revision bec2976ee302a1db100e77ac9ed66c9b61e0132a)
+@@ -7,7 +7,7 @@
+ import ru.javawebinar.topjava.model.User;
+ import ru.javawebinar.topjava.service.UserService;
+ import ru.javawebinar.topjava.to.UserTo;
+-import ru.javawebinar.topjava.util.UserUtil;
++import ru.javawebinar.topjava.util.UsersUtil;
+ import ru.javawebinar.topjava.web.AbstractControllerTest;
+ import ru.javawebinar.topjava.web.json.JsonUtil;
+ 
+@@ -55,7 +55,7 @@
+                 .andDo(print())
+                 .andExpect(status().isNoContent());
+ 
+-        USER_MATCHER.assertMatch(userService.get(USER_ID), UserUtil.updateFromTo(new User(user), updatedTo));
++        USER_MATCHER.assertMatch(userService.get(USER_ID), UsersUtil.updateFromTo(new User(user), updatedTo));
+     }
+ 
+     @Test

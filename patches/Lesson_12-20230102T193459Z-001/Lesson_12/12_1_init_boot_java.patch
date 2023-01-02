@@ -1,0 +1,2257 @@
+Subject: [PATCH] 12_1_init_boot_java
+---
+Index: src/main/java/ru/javawebinar/topjava/Main.java
+===================================================================
+diff --git a/src/main/java/ru/javawebinar/topjava/Main.java b/src/main/java/ru/javawebinar/topjava/Main.java
+deleted file mode 100644
+--- a/src/main/java/ru/javawebinar/topjava/Main.java	(revision 9f0638bb4205e957b68aa5da817d56102d10ab5d)
++++ /dev/null	(revision 9f0638bb4205e957b68aa5da817d56102d10ab5d)
+@@ -1,11 +0,0 @@
+-package ru.javawebinar.topjava;
+-
+-/**
+- * @see <a href="http://topjava.herokuapp.com">Demo application</a>
+- * @see <a href="https://github.com/JavaOPs/topjava">Initial project</a>
+- */
+-public class Main {
+-    public static void main(String[] args) {
+-        System.out.format("Hello TopJava Enterprise!");
+-    }
+-}
+Index: src/main/java/ru/javaops/topjava/util/UsersUtil.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/util/UsersUtil.java b/src/main/java/ru/javaops/topjava/util/UsersUtil.java
+new file mode 100644
+--- /dev/null	(date 1672059957920)
++++ b/src/main/java/ru/javaops/topjava/util/UsersUtil.java	(date 1672059957920)
+@@ -0,0 +1,29 @@
++package ru.javaops.topjava.util;
++
++import lombok.experimental.UtilityClass;
++import ru.javaops.topjava.model.Role;
++import ru.javaops.topjava.model.User;
++import ru.javaops.topjava.to.UserTo;
++
++import static ru.javaops.topjava.config.SecurityConfiguration.PASSWORD_ENCODER;
++
++@UtilityClass
++public class UsersUtil {
++
++    public static User createNewFromTo(UserTo userTo) {
++        return new User(null, userTo.getName(), userTo.getEmail().toLowerCase(), userTo.getPassword(), Role.USER);
++    }
++
++    public static User updateFromTo(User user, UserTo userTo) {
++        user.setName(userTo.getName());
++        user.setEmail(userTo.getEmail().toLowerCase());
++        user.setPassword(userTo.getPassword());
++        return user;
++    }
++
++    public static User prepareToSave(User user) {
++        user.setPassword(PASSWORD_ENCODER.encode(user.getPassword()));
++        user.setEmail(user.getEmail().toLowerCase());
++        return user;
++    }
++}
+\ No newline at end of file
+Index: src/main/java/ru/javaops/topjava/util/JsonUtil.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/util/JsonUtil.java b/src/main/java/ru/javaops/topjava/util/JsonUtil.java
+new file mode 100644
+--- /dev/null	(date 1672000152502)
++++ b/src/main/java/ru/javaops/topjava/util/JsonUtil.java	(date 1672000152502)
+@@ -0,0 +1,55 @@
++package ru.javaops.topjava.util;
++
++import com.fasterxml.jackson.core.JsonProcessingException;
++import com.fasterxml.jackson.core.type.TypeReference;
++import com.fasterxml.jackson.databind.ObjectMapper;
++import com.fasterxml.jackson.databind.ObjectReader;
++import lombok.experimental.UtilityClass;
++
++import java.io.IOException;
++import java.util.List;
++import java.util.Map;
++
++@UtilityClass
++public class JsonUtil {
++    private static ObjectMapper mapper;
++
++    public static void setMapper(ObjectMapper mapper) {
++        JsonUtil.mapper = mapper;
++    }
++
++    public static <T> List<T> readValues(String json, Class<T> clazz) {
++        ObjectReader reader = mapper.readerFor(clazz);
++        try {
++            return reader.<T>readValues(json).readAll();
++        } catch (IOException e) {
++            throw new IllegalArgumentException("Invalid read array from JSON:\n'" + json + "'", e);
++        }
++    }
++
++    public static <T> T readValue(String json, Class<T> clazz) {
++        try {
++            return mapper.readValue(json, clazz);
++        } catch (IOException e) {
++            throw new IllegalArgumentException("Invalid read from JSON:\n'" + json + "'", e);
++        }
++    }
++
++    public static <T> String writeValue(T obj) {
++        try {
++            return mapper.writeValueAsString(obj);
++        } catch (JsonProcessingException e) {
++            throw new IllegalStateException("Invalid write to JSON:\n'" + obj + "'", e);
++        }
++    }
++
++    public static <T> String writeAdditionProps(T obj, String addName, Object addValue) {
++        return writeAdditionProps(obj, Map.of(addName, addValue));
++    }
++
++    public static <T> String writeAdditionProps(T obj, Map<String, Object> addProps) {
++        Map<String, Object> map = mapper.convertValue(obj, new TypeReference<>() {});
++        map.putAll(addProps);
++        return writeValue(map);
++    }
++}
+\ No newline at end of file
+Index: src/main/java/ru/javaops/topjava/web/user/UniqueMailValidator.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/web/user/UniqueMailValidator.java b/src/main/java/ru/javaops/topjava/web/user/UniqueMailValidator.java
+new file mode 100644
+--- /dev/null	(date 1672002837702)
++++ b/src/main/java/ru/javaops/topjava/web/user/UniqueMailValidator.java	(date 1672002837702)
+@@ -0,0 +1,48 @@
++package ru.javaops.topjava.web.user;
++
++import jakarta.servlet.http.HttpServletRequest;
++import lombok.AllArgsConstructor;
++import org.springframework.lang.NonNull;
++import org.springframework.stereotype.Component;
++import org.springframework.util.StringUtils;
++import org.springframework.validation.Errors;
++import ru.javaops.topjava.HasIdAndEmail;
++import ru.javaops.topjava.repository.UserRepository;
++import ru.javaops.topjava.web.SecurityUtil;
++
++@Component
++@AllArgsConstructor
++public class UniqueMailValidator implements org.springframework.validation.Validator {
++    public static final String EXCEPTION_DUPLICATE_EMAIL = "User with this email already exists";
++
++    private final UserRepository repository;
++    private final HttpServletRequest request;
++
++    @Override
++    public boolean supports(@NonNull Class<?> clazz) {
++        return HasIdAndEmail.class.isAssignableFrom(clazz);
++    }
++
++    @Override
++    public void validate(@NonNull Object target, @NonNull Errors errors) {
++        HasIdAndEmail user = ((HasIdAndEmail) target);
++        if (StringUtils.hasText(user.getEmail())) {
++            repository.findByEmailIgnoreCase(user.getEmail())
++                    .ifPresent(dbUser -> {
++                        if (request.getMethod().equals("PUT")) {  // UPDATE
++                            int dbId = dbUser.id();
++
++                            // it is ok, if update ourselves
++                            if (user.getId() != null && dbId == user.id()) return;
++
++                            // Workaround for update with user.id=null in request body
++                            // ValidationUtil.assureIdConsistent called after this validation
++                            String requestURI = request.getRequestURI();
++                            if (requestURI.endsWith("/" + dbId) || (dbId == SecurityUtil.authId() && requestURI.contains("/profile")))
++                                return;
++                        }
++                        errors.rejectValue("email", "", EXCEPTION_DUPLICATE_EMAIL);
++                    });
++        }
++    }
++}
+Index: src/main/java/ru/javaops/topjava/web/user/ProfileController.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/web/user/ProfileController.java b/src/main/java/ru/javaops/topjava/web/user/ProfileController.java
+new file mode 100644
+--- /dev/null	(date 1672059957923)
++++ b/src/main/java/ru/javaops/topjava/web/user/ProfileController.java	(date 1672059957923)
+@@ -0,0 +1,42 @@
++package ru.javaops.topjava.web.user;
++
++import jakarta.validation.Valid;
++import org.springframework.http.HttpStatus;
++import org.springframework.http.MediaType;
++import org.springframework.security.core.annotation.AuthenticationPrincipal;
++import org.springframework.transaction.annotation.Transactional;
++import org.springframework.web.bind.annotation.*;
++import ru.javaops.topjava.model.User;
++import ru.javaops.topjava.to.UserTo;
++import ru.javaops.topjava.util.UsersUtil;
++import ru.javaops.topjava.web.AuthUser;
++
++import static ru.javaops.topjava.util.validation.ValidationUtil.assureIdConsistent;
++
++@RestController
++@RequestMapping(value = ProfileController.REST_URL, produces = MediaType.APPLICATION_JSON_VALUE)
++public class ProfileController extends AbstractUserController {
++    static final String REST_URL = "/api/profile";
++
++    @GetMapping
++    public User get(@AuthenticationPrincipal AuthUser authUser) {
++        log.info("get {}", authUser);
++        return authUser.getUser();
++    }
++
++    @DeleteMapping
++    @ResponseStatus(HttpStatus.NO_CONTENT)
++    public void delete(@AuthenticationPrincipal AuthUser authUser) {
++        super.delete(authUser.id());
++    }
++
++    @PutMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
++    @ResponseStatus(HttpStatus.NO_CONTENT)
++    @Transactional
++    public void update(@RequestBody @Valid UserTo userTo, @AuthenticationPrincipal AuthUser authUser) {
++        log.info("update {} with id={}", userTo, authUser.id());
++        assureIdConsistent(userTo, authUser.id());
++        User user = authUser.getUser();
++        prepareAndSave(UsersUtil.updateFromTo(user, userTo));
++    }
++}
+\ No newline at end of file
+Index: src/main/java/ru/javaops/topjava/web/user/AdminUserController.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/web/user/AdminUserController.java b/src/main/java/ru/javaops/topjava/web/user/AdminUserController.java
+new file mode 100644
+--- /dev/null	(date 1672059957922)
++++ b/src/main/java/ru/javaops/topjava/web/user/AdminUserController.java	(date 1672059957922)
+@@ -0,0 +1,77 @@
++package ru.javaops.topjava.web.user;
++
++import jakarta.validation.Valid;
++import org.springframework.data.domain.Sort;
++import org.springframework.http.HttpStatus;
++import org.springframework.http.MediaType;
++import org.springframework.http.ResponseEntity;
++import org.springframework.transaction.annotation.Transactional;
++import org.springframework.web.bind.annotation.*;
++import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
++import ru.javaops.topjava.model.User;
++
++import java.net.URI;
++import java.util.List;
++
++import static ru.javaops.topjava.util.validation.ValidationUtil.assureIdConsistent;
++import static ru.javaops.topjava.util.validation.ValidationUtil.checkNew;
++
++@RestController
++@RequestMapping(value = AdminUserController.REST_URL, produces = MediaType.APPLICATION_JSON_VALUE)
++public class AdminUserController extends AbstractUserController {
++
++    static final String REST_URL = "/api/admin/users";
++
++    @Override
++    @GetMapping("/{id}")
++    public ResponseEntity<User> get(@PathVariable int id) {
++        return super.get(id);
++    }
++
++    @Override
++    @DeleteMapping("/{id}")
++    @ResponseStatus(HttpStatus.NO_CONTENT)
++    public void delete(@PathVariable int id) {
++        super.delete(id);
++    }
++
++    @GetMapping
++    public List<User> getAll() {
++        log.info("getAll");
++        return repository.findAll(Sort.by(Sort.Direction.ASC, "name", "email"));
++    }
++
++    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
++    public ResponseEntity<User> createWithLocation(@Valid @RequestBody User user) {
++        log.info("create {}", user);
++        checkNew(user);
++        User created = prepareAndSave(user);
++        URI uriOfNewResource = ServletUriComponentsBuilder.fromCurrentContextPath()
++                .path(REST_URL + "/{id}")
++                .buildAndExpand(created.getId()).toUri();
++        return ResponseEntity.created(uriOfNewResource).body(created);
++    }
++
++    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
++    @ResponseStatus(HttpStatus.NO_CONTENT)
++    public void update(@Valid @RequestBody User user, @PathVariable int id) {
++        log.info("update {} with id={}", user, id);
++        assureIdConsistent(user, id);
++        prepareAndSave(user);
++    }
++
++    @GetMapping("/by-email")
++    public ResponseEntity<User> getByEmail(@RequestParam String email) {
++        log.info("getByEmail {}", email);
++        return ResponseEntity.of(repository.findByEmailIgnoreCase(email));
++    }
++
++    @PatchMapping("/{id}")
++    @ResponseStatus(HttpStatus.NO_CONTENT)
++    @Transactional
++    public void enable(@PathVariable int id, @RequestParam boolean enabled) {
++        log.info(enabled ? "enable {}" : "disable {}", id);
++        User user = repository.getExisted(id);
++        user.setEnabled(enabled);
++    }
++}
+\ No newline at end of file
+Index: src/main/java/ru/javaops/topjava/web/user/AbstractUserController.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/web/user/AbstractUserController.java b/src/main/java/ru/javaops/topjava/web/user/AbstractUserController.java
+new file mode 100644
+--- /dev/null	(date 1672059957921)
++++ b/src/main/java/ru/javaops/topjava/web/user/AbstractUserController.java	(date 1672059957921)
+@@ -0,0 +1,42 @@
++package ru.javaops.topjava.web.user;
++
++import org.slf4j.Logger;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.http.ResponseEntity;
++import org.springframework.web.bind.WebDataBinder;
++import org.springframework.web.bind.annotation.InitBinder;
++import ru.javaops.topjava.model.User;
++import ru.javaops.topjava.repository.UserRepository;
++import ru.javaops.topjava.util.UsersUtil;
++
++import static org.slf4j.LoggerFactory.getLogger;
++
++public abstract class AbstractUserController {
++
++    protected final Logger log = getLogger(getClass());
++
++    @Autowired
++    protected UserRepository repository;
++
++    @Autowired
++    private UniqueMailValidator emailValidator;
++
++    @InitBinder
++    protected void initBinder(WebDataBinder binder) {
++        binder.addValidators(emailValidator);
++    }
++
++    public ResponseEntity<User> get(int id) {
++        log.info("get {}", id);
++        return ResponseEntity.of(repository.findById(id));
++    }
++
++    public void delete(int id) {
++        log.info("delete {}", id);
++        repository.deleteExisted(id);
++    }
++
++    protected User prepareAndSave(User user) {
++        return repository.save(UsersUtil.prepareToSave(user));
++    }
++}
+\ No newline at end of file
+Index: src/main/java/ru/javaops/topjava/CaloriesManagementRestApplication.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/CaloriesManagementRestApplication.java b/src/main/java/ru/javaops/topjava/CaloriesManagementRestApplication.java
+new file mode 100644
+--- /dev/null	(date 1672000152543)
++++ b/src/main/java/ru/javaops/topjava/CaloriesManagementRestApplication.java	(date 1672000152543)
+@@ -0,0 +1,12 @@
++package ru.javaops.topjava;
++
++import org.springframework.boot.SpringApplication;
++import org.springframework.boot.autoconfigure.SpringBootApplication;
++
++@SpringBootApplication
++public class CaloriesManagementRestApplication {
++
++    public static void main(String[] args) {
++        SpringApplication.run(CaloriesManagementRestApplication.class, args);
++    }
++}
+Index: src/main/java/ru/javaops/topjava/web/SecurityUtil.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/web/SecurityUtil.java b/src/main/java/ru/javaops/topjava/web/SecurityUtil.java
+new file mode 100644
+--- /dev/null	(date 1672000152538)
++++ b/src/main/java/ru/javaops/topjava/web/SecurityUtil.java	(date 1672000152538)
+@@ -0,0 +1,33 @@
++package ru.javaops.topjava.web;
++
++import lombok.experimental.UtilityClass;
++import org.springframework.security.core.Authentication;
++import org.springframework.security.core.context.SecurityContextHolder;
++import ru.javaops.topjava.model.User;
++
++import static java.util.Objects.requireNonNull;
++
++@UtilityClass
++public class SecurityUtil {
++
++    public static AuthUser safeGet() {
++        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
++        if (auth == null) {
++            return null;
++        }
++        Object principal = auth.getPrincipal();
++        return (principal instanceof AuthUser) ? (AuthUser) principal : null;
++    }
++
++    public static AuthUser get() {
++        return requireNonNull(safeGet(), "No authorized user found");
++    }
++
++    public static User authUser() {
++        return get().getUser();
++    }
++
++    public static int authId() {
++        return get().getUser().id();
++    }
++}
+\ No newline at end of file
+Index: src/main/java/ru/javaops/topjava/web/GlobalExceptionHandler.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/web/GlobalExceptionHandler.java b/src/main/java/ru/javaops/topjava/web/GlobalExceptionHandler.java
+new file mode 100644
+--- /dev/null	(date 1672059957921)
++++ b/src/main/java/ru/javaops/topjava/web/GlobalExceptionHandler.java	(date 1672059957921)
+@@ -0,0 +1,52 @@
++package ru.javaops.topjava.web;
++
++import lombok.AllArgsConstructor;
++import lombok.extern.slf4j.Slf4j;
++import org.springframework.context.MessageSource;
++import org.springframework.context.i18n.LocaleContextHolder;
++import org.springframework.http.*;
++import org.springframework.validation.FieldError;
++import org.springframework.validation.ObjectError;
++import org.springframework.web.bind.MethodArgumentNotValidException;
++import org.springframework.web.bind.annotation.ExceptionHandler;
++import org.springframework.web.bind.annotation.RestControllerAdvice;
++import org.springframework.web.context.request.WebRequest;
++import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
++import ru.javaops.topjava.error.AppException;
++
++import java.util.LinkedHashMap;
++import java.util.Map;
++
++@RestControllerAdvice
++@AllArgsConstructor
++@Slf4j
++public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
++    private final MessageSource messageSource;
++
++    @Override
++    protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
++        ProblemDetail body = ex.updateAndGetBody(this.messageSource, LocaleContextHolder.getLocale());
++        Map<String, String> invalidParams = new LinkedHashMap<>();
++        for (ObjectError error : ex.getBindingResult().getGlobalErrors()) {
++            invalidParams.put(error.getObjectName(), getErrorMessage(error));
++        }
++        for (FieldError error : ex.getBindingResult().getFieldErrors()) {
++            invalidParams.put(error.getField(), getErrorMessage(error));
++        }
++        body.setProperty("invalid_params", invalidParams);
++        body.setStatus(HttpStatus.UNPROCESSABLE_ENTITY);
++        return handleExceptionInternal(ex, body, headers, HttpStatus.UNPROCESSABLE_ENTITY, request);
++    }
++
++    @ExceptionHandler(AppException.class)
++    public ResponseEntity<?> appException(AppException ex, WebRequest request) {
++        log.error("ApplicationException: {}", ex.getMessage());
++        ProblemDetail body = createProblemDetail(ex, ex.getStatusCode(), ex.getMessage(), null, null, request);
++        return handleExceptionInternal(ex, body, new HttpHeaders(), ex.getStatusCode(), request);
++    }
++
++    private String getErrorMessage(ObjectError error) {
++        return messageSource.getMessage(
++                error.getCode(), error.getArguments(), error.getDefaultMessage(), LocaleContextHolder.getLocale());
++    }
++}
+Index: src/main/java/ru/javaops/topjava/web/user/RegisterController.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/web/user/RegisterController.java b/src/main/java/ru/javaops/topjava/web/user/RegisterController.java
+new file mode 100644
+--- /dev/null	(date 1672041657821)
++++ b/src/main/java/ru/javaops/topjava/web/user/RegisterController.java	(date 1672041657821)
+@@ -0,0 +1,32 @@
++package ru.javaops.topjava.web.user;
++
++import jakarta.validation.Valid;
++import org.springframework.http.HttpStatus;
++import org.springframework.http.MediaType;
++import org.springframework.http.ResponseEntity;
++import org.springframework.web.bind.annotation.*;
++import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
++import ru.javaops.topjava.model.User;
++import ru.javaops.topjava.to.UserTo;
++import ru.javaops.topjava.util.UsersUtil;
++
++import java.net.URI;
++
++import static ru.javaops.topjava.util.validation.ValidationUtil.checkNew;
++
++@RestController
++@RequestMapping(value = RegisterController.REST_URL, produces = MediaType.APPLICATION_JSON_VALUE)
++public class RegisterController extends AbstractUserController {
++    static final String REST_URL = "/api/register";
++
++    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
++    @ResponseStatus(HttpStatus.CREATED)
++    public ResponseEntity<User> register(@Valid @RequestBody UserTo userTo) {
++        log.info("register {}", userTo);
++        checkNew(userTo);
++        User created = prepareAndSave(UsersUtil.createNewFromTo(userTo));
++        URI uriOfNewResource = ServletUriComponentsBuilder.fromCurrentContextPath()
++                .path(REST_URL).build().toUri();
++        return ResponseEntity.created(uriOfNewResource).body(created);
++    }
++}
+\ No newline at end of file
+Index: src/main/java/ru/javaops/topjava/web/AuthUser.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/web/AuthUser.java b/src/main/java/ru/javaops/topjava/web/AuthUser.java
+new file mode 100644
+--- /dev/null	(date 1672002952303)
++++ b/src/main/java/ru/javaops/topjava/web/AuthUser.java	(date 1672002952303)
+@@ -0,0 +1,25 @@
++package ru.javaops.topjava.web;
++
++import lombok.Getter;
++import org.springframework.lang.NonNull;
++import ru.javaops.topjava.model.User;
++
++public class AuthUser extends org.springframework.security.core.userdetails.User {
++
++    @Getter
++    private final User user;
++
++    public AuthUser(@NonNull User user) {
++        super(user.getEmail(), user.getPassword(), user.getRoles());
++        this.user = user;
++    }
++
++    public int id() {
++        return user.id();
++    }
++
++    @Override
++    public String toString() {
++        return "AuthUser:" + user.getId() + '[' + user.getEmail() + ']';
++    }
++}
+\ No newline at end of file
+Index: src/main/resources/application.yaml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/resources/application.yaml b/src/main/resources/application.yaml
+new file mode 100644
+--- /dev/null	(date 1672003181504)
++++ b/src/main/resources/application.yaml	(date 1672003181504)
+@@ -0,0 +1,56 @@
++#  https://docs.spring.io/spring-boot/docs/current/reference/html/common-application-properties.html
++spring:
++  jpa:
++    show-sql: true
++    open-in-view: false
++    # https://stackoverflow.com/a/67678945/548473
++    defer-datasource-initialization: true
++    hibernate:
++      ddl-auto: create
++    properties:
++      #  http://docs.jboss.org/hibernate/orm/5.3/userguide/html_single/Hibernate_User_Guide.html#configurations
++      hibernate:
++        format_sql: true
++        default_batch_fetch_size: 20
++        # https://stackoverflow.com/questions/21257819/what-is-the-difference-between-hibernate-jdbc-fetch-size-and-hibernate-jdbc-batc
++        jdbc.batch_size: 20
++  datasource:
++    # ImMemory
++    url: jdbc:h2:mem:topjava
++    #    tcp: jdbc:h2:tcp://localhost:9092/mem:topjava
++    # Absolute path
++    #    url: jdbc:h2:C:/projects/bootjava/db/topjava
++    #    tcp: jdbc:h2:tcp://localhost:9092/C:/projects/bootjava/db/topjava
++    # Relative path form current dir
++    #    url: jdbc:h2:./db/topjava
++    # Relative path from home
++    #    url: jdbc:h2:~/topjava
++    #    tcp: jdbc:h2:tcp://localhost:9092/~/topjava
++    username: sa
++    password:
++
++# Jackson Serialization Issue Resolver
++  jackson.visibility:
++    field: any
++    getter: none
++    setter: none
++    is-getter: none
++
++  # https://docs.spring.io/spring-boot/docs/current/reference/html/appendix-application-properties.html#common-application-properties-cache
++  cache:
++    cache-names: users
++    caffeine.spec: maximumSize=5000,expireAfterAccess=60s
++
++logging:
++  level:
++    root: WARN
++    ru.javaops.topjava: DEBUG
++    org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: DEBUG
++
++server.servlet:
++  encoding:
++    charset: UTF-8 # Charset of HTTP requests and responses. Added to the "Content-Type" header if not set explicitly
++    enabled: true # Enable http encoding support
++    force: true
++
++springdoc.swagger-ui.path: /
+Index: src/main/java/ru/javaops/topjava/HasIdAndEmail.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/HasIdAndEmail.java b/src/main/java/ru/javaops/topjava/HasIdAndEmail.java
+new file mode 100644
+--- /dev/null	(date 1672000152552)
++++ b/src/main/java/ru/javaops/topjava/HasIdAndEmail.java	(date 1672000152552)
+@@ -0,0 +1,5 @@
++package ru.javaops.topjava;
++
++public interface HasIdAndEmail extends HasId {
++    String getEmail();
++}
+\ No newline at end of file
+Index: src/main/java/ru/javaops/topjava/HasId.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/HasId.java b/src/main/java/ru/javaops/topjava/HasId.java
+new file mode 100644
+--- /dev/null	(date 1672006342610)
++++ b/src/main/java/ru/javaops/topjava/HasId.java	(date 1672006342610)
+@@ -0,0 +1,21 @@
++package ru.javaops.topjava;
++
++import com.fasterxml.jackson.annotation.JsonIgnore;
++import org.springframework.util.Assert;
++
++public interface HasId {
++    Integer getId();
++
++    void setId(Integer id);
++
++    @JsonIgnore
++    default boolean isNew() {
++        return getId() == null;
++    }
++
++    // doesn't work for hibernate lazy proxy
++    default int id() {
++        Assert.notNull(getId(), "Entity must has id");
++        return getId();
++    }
++}
+Index: src/test/resources/application-test.yaml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/test/resources/application-test.yaml b/src/test/resources/application-test.yaml
+new file mode 100644
+--- /dev/null	(date 1672000152640)
++++ b/src/test/resources/application-test.yaml	(date 1672000152640)
+@@ -0,0 +1,1 @@
++spring.cache.type: none
+\ No newline at end of file
+Index: src/main/resources/data.sql
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/resources/data.sql b/src/main/resources/data.sql
+new file mode 100644
+--- /dev/null	(date 1672059957923)
++++ b/src/main/resources/data.sql	(date 1672059957923)
+@@ -0,0 +1,9 @@
++INSERT INTO USERS (NAME, EMAIL, PASSWORD)
++VALUES ('User', 'user@yandex.ru', '{noop}password'),
++       ('Admin', 'admin@gmail.com', '{noop}admin'),
++       ('Guest', 'guest@gmail.com', '{noop}guest');
++
++INSERT INTO USER_ROLE (ROLE, USER_ID)
++VALUES ('USER', 1),
++       ('ADMIN', 2),
++       ('USER', 2);
+\ No newline at end of file
+Index: src/test/java/ru/javaops/topjava/web/user/UserTestData.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/test/java/ru/javaops/topjava/web/user/UserTestData.java b/src/test/java/ru/javaops/topjava/web/user/UserTestData.java
+new file mode 100644
+--- /dev/null	(date 1672059957925)
++++ b/src/test/java/ru/javaops/topjava/web/user/UserTestData.java	(date 1672059957925)
+@@ -0,0 +1,37 @@
++package ru.javaops.topjava.web.user;
++
++import ru.javaops.topjava.model.Role;
++import ru.javaops.topjava.model.User;
++import ru.javaops.topjava.util.JsonUtil;
++import ru.javaops.topjava.web.MatcherFactory;
++
++import java.util.Collections;
++import java.util.Date;
++
++public class UserTestData {
++    public static final MatcherFactory.Matcher<User> USER_MATCHER = MatcherFactory.usingIgnoringFieldsComparator(User.class, "registered", "password");
++
++    public static final int USER_ID = 1;
++    public static final int ADMIN_ID = 2;
++    public static final int GUEST_ID = 3;
++    public static final int NOT_FOUND = 100;
++    public static final String USER_MAIL = "user@yandex.ru";
++    public static final String ADMIN_MAIL = "admin@gmail.com";
++    public static final String GUEST_MAIL = "guest@gmail.com";
++
++    public static final User user = new User(USER_ID, "User", USER_MAIL, "password", Role.USER);
++    public static final User admin = new User(ADMIN_ID, "Admin", ADMIN_MAIL, "admin", Role.ADMIN, Role.USER);
++    public static final User guest = new User(GUEST_ID, "Guest", GUEST_MAIL, "guest");
++
++    public static User getNew() {
++        return new User(null, "New", "new@gmail.com", "newPass", false, new Date(), Collections.singleton(Role.USER));
++    }
++
++    public static User getUpdated() {
++        return new User(USER_ID, "UpdatedName", USER_MAIL, "newPass", false, new Date(), Collections.singleton(Role.ADMIN));
++    }
++
++    public static String jsonWithPassword(User user, String passw) {
++        return JsonUtil.writeAdditionProps(user, "password", passw);
++    }
++}
+Index: src/test/java/ru/javaops/topjava/web/user/RegisterControllerTest.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/test/java/ru/javaops/topjava/web/user/RegisterControllerTest.java b/src/test/java/ru/javaops/topjava/web/user/RegisterControllerTest.java
+new file mode 100644
+--- /dev/null	(date 1672059957925)
++++ b/src/test/java/ru/javaops/topjava/web/user/RegisterControllerTest.java	(date 1672059957925)
+@@ -0,0 +1,51 @@
++package ru.javaops.topjava.web.user;
++
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.http.MediaType;
++import org.springframework.test.web.servlet.ResultActions;
++import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
++import ru.javaops.topjava.model.User;
++import ru.javaops.topjava.repository.UserRepository;
++import ru.javaops.topjava.to.UserTo;
++import ru.javaops.topjava.util.JsonUtil;
++import ru.javaops.topjava.util.UsersUtil;
++import ru.javaops.topjava.web.AbstractControllerTest;
++
++import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
++import static ru.javaops.topjava.web.user.RegisterController.REST_URL;
++import static ru.javaops.topjava.web.user.UserTestData.USER_MATCHER;
++
++class RegisterControllerTest extends AbstractControllerTest {
++
++    @Autowired
++    private UserRepository userRepository;
++
++    @Test
++    void register() throws Exception {
++        UserTo newTo = new UserTo(null, "newName", "newemail@ya.ru", "newPassword");
++        User newUser = UsersUtil.createNewFromTo(newTo);
++        ResultActions action = perform(MockMvcRequestBuilders.post(REST_URL)
++                .contentType(MediaType.APPLICATION_JSON)
++                .content(JsonUtil.writeValue(newTo)))
++                .andDo(print())
++                .andExpect(status().isCreated());
++
++        User created = USER_MATCHER.readFromJson(action);
++        int newId = created.id();
++        newUser.setId(newId);
++        USER_MATCHER.assertMatch(created, newUser);
++        USER_MATCHER.assertMatch(userRepository.getExisted(newId), newUser);
++    }
++
++    @Test
++    void registerInvalid() throws Exception {
++        UserTo newTo = new UserTo(null, null, null, null);
++        perform(MockMvcRequestBuilders.post(REST_URL)
++                .contentType(MediaType.APPLICATION_JSON)
++                .content(JsonUtil.writeValue(newTo)))
++                .andDo(print())
++                .andExpect(status().isUnprocessableEntity());
++    }
++}
+\ No newline at end of file
+Index: src/test/java/ru/javaops/topjava/web/user/ProfileControllerTest.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/test/java/ru/javaops/topjava/web/user/ProfileControllerTest.java b/src/test/java/ru/javaops/topjava/web/user/ProfileControllerTest.java
+new file mode 100644
+--- /dev/null	(date 1672059957924)
++++ b/src/test/java/ru/javaops/topjava/web/user/ProfileControllerTest.java	(date 1672059957924)
+@@ -0,0 +1,84 @@
++package ru.javaops.topjava.web.user;
++
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.http.MediaType;
++import org.springframework.security.test.context.support.WithUserDetails;
++import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
++import ru.javaops.topjava.model.User;
++import ru.javaops.topjava.repository.UserRepository;
++import ru.javaops.topjava.to.UserTo;
++import ru.javaops.topjava.util.JsonUtil;
++import ru.javaops.topjava.util.UsersUtil;
++import ru.javaops.topjava.web.AbstractControllerTest;
++
++import static org.hamcrest.Matchers.containsString;
++import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
++import static ru.javaops.topjava.web.user.ProfileController.REST_URL;
++import static ru.javaops.topjava.web.user.UniqueMailValidator.EXCEPTION_DUPLICATE_EMAIL;
++import static ru.javaops.topjava.web.user.UserTestData.*;
++
++class ProfileControllerTest extends AbstractControllerTest {
++
++    @Autowired
++    private UserRepository userRepository;
++
++    @Test
++    @WithUserDetails(value = USER_MAIL)
++    void get() throws Exception {
++        perform(MockMvcRequestBuilders.get(REST_URL))
++                .andExpect(status().isOk())
++                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
++                .andExpect(USER_MATCHER.contentJson(user));
++    }
++
++    @Test
++    void getUnauthorized() throws Exception {
++        perform(MockMvcRequestBuilders.get(REST_URL))
++                .andExpect(status().isUnauthorized());
++    }
++
++    @Test
++    @WithUserDetails(value = USER_MAIL)
++    void delete() throws Exception {
++        perform(MockMvcRequestBuilders.delete(REST_URL))
++                .andExpect(status().isNoContent());
++        USER_MATCHER.assertMatch(userRepository.findAll(), admin, guest);
++    }
++
++    @Test
++    @WithUserDetails(value = USER_MAIL)
++    void update() throws Exception {
++        UserTo updatedTo = new UserTo(null, "newName", USER_MAIL, "newPassword");
++        perform(MockMvcRequestBuilders.put(REST_URL).contentType(MediaType.APPLICATION_JSON)
++                .content(JsonUtil.writeValue(updatedTo)))
++                .andDo(print())
++                .andExpect(status().isNoContent());
++
++        USER_MATCHER.assertMatch(userRepository.getExisted(USER_ID), UsersUtil.updateFromTo(new User(user), updatedTo));
++    }
++
++    @Test
++    @WithUserDetails(value = USER_MAIL)
++    void updateInvalid() throws Exception {
++        UserTo updatedTo = new UserTo(null, null, "password", null);
++        perform(MockMvcRequestBuilders.put(REST_URL)
++                .contentType(MediaType.APPLICATION_JSON)
++                .content(JsonUtil.writeValue(updatedTo)))
++                .andDo(print())
++                .andExpect(status().isUnprocessableEntity());
++    }
++
++    @Test
++    @WithUserDetails(value = USER_MAIL)
++    void updateDuplicate() throws Exception {
++        UserTo updatedTo = new UserTo(null, "newName", ADMIN_MAIL, "newPassword");
++        perform(MockMvcRequestBuilders.put(REST_URL).contentType(MediaType.APPLICATION_JSON)
++                .content(JsonUtil.writeValue(updatedTo)))
++                .andDo(print())
++                .andExpect(status().isUnprocessableEntity())
++                .andExpect(content().string(containsString(EXCEPTION_DUPLICATE_EMAIL)));
++    }
++}
+\ No newline at end of file
+Index: src/test/java/ru/javaops/topjava/web/user/AdminUserControllerTest.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/test/java/ru/javaops/topjava/web/user/AdminUserControllerTest.java b/src/test/java/ru/javaops/topjava/web/user/AdminUserControllerTest.java
+new file mode 100644
+--- /dev/null	(date 1672059957924)
++++ b/src/test/java/ru/javaops/topjava/web/user/AdminUserControllerTest.java	(date 1672059957924)
+@@ -0,0 +1,212 @@
++package ru.javaops.topjava.web.user;
++
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.http.MediaType;
++import org.springframework.security.test.context.support.WithUserDetails;
++import org.springframework.test.web.servlet.ResultActions;
++import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
++import org.springframework.transaction.annotation.Propagation;
++import org.springframework.transaction.annotation.Transactional;
++import ru.javaops.topjava.model.Role;
++import ru.javaops.topjava.model.User;
++import ru.javaops.topjava.repository.UserRepository;
++import ru.javaops.topjava.web.AbstractControllerTest;
++
++import static org.hamcrest.Matchers.containsString;
++import static org.junit.jupiter.api.Assertions.assertFalse;
++import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
++import static ru.javaops.topjava.web.user.AdminUserController.REST_URL;
++import static ru.javaops.topjava.web.user.UniqueMailValidator.EXCEPTION_DUPLICATE_EMAIL;
++import static ru.javaops.topjava.web.user.UserTestData.*;
++
++class AdminUserControllerTest extends AbstractControllerTest {
++
++    private static final String REST_URL_SLASH = REST_URL + '/';
++
++    @Autowired
++    private UserRepository userRepository;
++
++    @Test
++    @WithUserDetails(value = ADMIN_MAIL)
++    void get() throws Exception {
++        perform(MockMvcRequestBuilders.get(REST_URL_SLASH + ADMIN_ID))
++                .andExpect(status().isOk())
++                .andDo(print())
++                // https://jira.spring.io/browse/SPR-14472
++                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
++                .andExpect(USER_MATCHER.contentJson(admin));
++    }
++
++    @Test
++    @WithUserDetails(value = ADMIN_MAIL)
++    void getNotFound() throws Exception {
++        perform(MockMvcRequestBuilders.get(REST_URL_SLASH + NOT_FOUND))
++                .andDo(print())
++                .andExpect(status().isNotFound());
++    }
++
++    @Test
++    @WithUserDetails(value = ADMIN_MAIL)
++    void getByEmail() throws Exception {
++        perform(MockMvcRequestBuilders.get(REST_URL_SLASH + "by-email?email=" + admin.getEmail()))
++                .andExpect(status().isOk())
++                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
++                .andExpect(USER_MATCHER.contentJson(admin));
++    }
++
++    @Test
++    @WithUserDetails(value = ADMIN_MAIL)
++    void delete() throws Exception {
++        perform(MockMvcRequestBuilders.delete(REST_URL_SLASH + USER_ID))
++                .andDo(print())
++                .andExpect(status().isNoContent());
++        assertFalse(userRepository.findById(USER_ID).isPresent());
++    }
++
++    @Test
++    @WithUserDetails(value = ADMIN_MAIL)
++    void deleteNotFound() throws Exception {
++        perform(MockMvcRequestBuilders.delete(REST_URL_SLASH + NOT_FOUND))
++                .andDo(print())
++                .andExpect(status().isUnprocessableEntity());
++    }
++
++    @Test
++    @WithUserDetails(value = ADMIN_MAIL)
++    void enableNotFound() throws Exception {
++        perform(MockMvcRequestBuilders.patch(REST_URL_SLASH + NOT_FOUND)
++                .param("enabled", "false")
++                .contentType(MediaType.APPLICATION_JSON))
++                .andDo(print())
++                .andExpect(status().isUnprocessableEntity());
++    }
++
++    @Test
++    void getUnauthorized() throws Exception {
++        perform(MockMvcRequestBuilders.get(REST_URL))
++                .andExpect(status().isUnauthorized());
++    }
++
++    @Test
++    @WithUserDetails(value = USER_MAIL)
++    void getForbidden() throws Exception {
++        perform(MockMvcRequestBuilders.get(REST_URL))
++                .andExpect(status().isForbidden());
++    }
++
++    @Test
++    @WithUserDetails(value = ADMIN_MAIL)
++    void update() throws Exception {
++        User updated = getUpdated();
++        updated.setId(null);
++        perform(MockMvcRequestBuilders.put(REST_URL_SLASH + USER_ID)
++                .contentType(MediaType.APPLICATION_JSON)
++                .content(jsonWithPassword(updated, "newPass")))
++                .andDo(print())
++                .andExpect(status().isNoContent());
++
++        USER_MATCHER.assertMatch(userRepository.getExisted(USER_ID), getUpdated());
++    }
++
++    @Test
++    @WithUserDetails(value = ADMIN_MAIL)
++    void createWithLocation() throws Exception {
++        User newUser = getNew();
++        ResultActions action = perform(MockMvcRequestBuilders.post(REST_URL)
++                .contentType(MediaType.APPLICATION_JSON)
++                .content(jsonWithPassword(newUser, "newPass")))
++                .andExpect(status().isCreated());
++
++        User created = USER_MATCHER.readFromJson(action);
++        int newId = created.id();
++        newUser.setId(newId);
++        USER_MATCHER.assertMatch(created, newUser);
++        USER_MATCHER.assertMatch(userRepository.getExisted(newId), newUser);
++    }
++
++    @Test
++    @WithUserDetails(value = ADMIN_MAIL)
++    void getAll() throws Exception {
++        perform(MockMvcRequestBuilders.get(REST_URL))
++                .andExpect(status().isOk())
++                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
++                .andExpect(USER_MATCHER.contentJson(admin, guest, user));
++    }
++
++    @Test
++    @WithUserDetails(value = ADMIN_MAIL)
++    void enable() throws Exception {
++        perform(MockMvcRequestBuilders.patch(REST_URL_SLASH + USER_ID)
++                .param("enabled", "false")
++                .contentType(MediaType.APPLICATION_JSON))
++                .andDo(print())
++                .andExpect(status().isNoContent());
++
++        assertFalse(userRepository.getExisted(USER_ID).isEnabled());
++    }
++
++    @Test
++    @WithUserDetails(value = ADMIN_MAIL)
++    void createInvalid() throws Exception {
++        User invalid = new User(null, null, "", "newPass", Role.USER, Role.ADMIN);
++        perform(MockMvcRequestBuilders.post(REST_URL)
++                .contentType(MediaType.APPLICATION_JSON)
++                .content(jsonWithPassword(invalid, "newPass")))
++                .andDo(print())
++                .andExpect(status().isUnprocessableEntity());
++    }
++
++    @Test
++    @WithUserDetails(value = ADMIN_MAIL)
++    void updateInvalid() throws Exception {
++        User invalid = new User(user);
++        invalid.setName("");
++        perform(MockMvcRequestBuilders.put(REST_URL_SLASH + USER_ID)
++                .contentType(MediaType.APPLICATION_JSON)
++                .content(jsonWithPassword(invalid, "password")))
++                .andDo(print())
++                .andExpect(status().isUnprocessableEntity());
++    }
++
++    @Test
++    @WithUserDetails(value = ADMIN_MAIL)
++    void updateHtmlUnsafe() throws Exception {
++        User updated = new User(user);
++        updated.setName("<script>alert(123)</script>");
++        perform(MockMvcRequestBuilders.put(REST_URL_SLASH + USER_ID)
++                .contentType(MediaType.APPLICATION_JSON)
++                .content(jsonWithPassword(updated, "password")))
++                .andDo(print())
++                .andExpect(status().isUnprocessableEntity());
++    }
++
++    @Test
++    @Transactional(propagation = Propagation.NEVER)
++    @WithUserDetails(value = ADMIN_MAIL)
++    void updateDuplicate() throws Exception {
++        User updated = new User(user);
++        updated.setEmail(ADMIN_MAIL);
++        perform(MockMvcRequestBuilders.put(REST_URL_SLASH + USER_ID)
++                .contentType(MediaType.APPLICATION_JSON)
++                .content(jsonWithPassword(updated, "password")))
++                .andDo(print())
++                .andExpect(status().isUnprocessableEntity())
++                .andExpect(content().string(containsString(EXCEPTION_DUPLICATE_EMAIL)));
++    }
++
++    @Test
++    @Transactional(propagation = Propagation.NEVER)
++    @WithUserDetails(value = ADMIN_MAIL)
++    void createDuplicate() throws Exception {
++        User expected = new User(null, "New", USER_MAIL, "newPass", Role.USER, Role.ADMIN);
++        perform(MockMvcRequestBuilders.post(REST_URL)
++                .contentType(MediaType.APPLICATION_JSON)
++                .content(jsonWithPassword(expected, "newPass")))
++                .andDo(print())
++                .andExpect(status().isUnprocessableEntity())
++                .andExpect(content().string(containsString(EXCEPTION_DUPLICATE_EMAIL)));
++    }
++}
+\ No newline at end of file
+Index: README.md
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/README.md b/README.md
+new file mode 100644
+--- /dev/null	(date 1672060049907)
++++ b/README.md	(date 1672060049907)
+@@ -0,0 +1,28 @@
++Java Enterprise Online Project
++===============================
++
++Наиболее востребованные технологии /инструменты / фреймворки Java Enterprise:
++Maven/ Spring/ Security/ JPA(Hibernate)/ REST(Jackson)/ Bootstrap(CSS)/ jQuery + plugins.
++
++- [Вступительное занятие](https://github.com/JavaOPs/topjava)
++- [Описание и план проекта](https://github.com/JavaOPs/topjava/blob/master/description.md)
++- [Wiki](https://github.com/JavaOPs/topjava/wiki)
++- [Wiki Git](https://github.com/JavaOPs/topjava/wiki/Git)
++- [Wiki IDEA](https://github.com/JavaOPs/topjava/wiki/IDEA)
++- [Демо разрабатываемого приложения](http://topjava.herokuapp.com/)
++
++### Миграция TopJava на Spring-Boot
++За основу взят финальный код проекта BootJava с миграцией на Spring Boot 3.0 - это первый патч открытого урока курса [CloudJava](https://javaops.ru/view/cloudjava/lesson01),
++ветка [_patched_](https://github.com/JavaOPs/cloudjava/tree/patched).
++
++-------------------------------------------------------------
++- Stack: [JDK 17](http://jdk.java.net/17/), Spring Boot 3.0, Lombok, H2, Caffeine Cache, Swagger/OpenAPI 3.0
++- Run: `mvn spring-boot:run` in root directory.
++-----------------------------------------------------
++[REST API documentation](http://localhost:8080/)  
++Креденшелы:
++```
++Admin: admin@gmail.com / admin
++User:  user@yandex.ru / password
++Guest: guest@gmail.com / guest
++```
+\ No newline at end of file
+Index: src/test/java/ru/javaops/topjava/web/MatcherFactory.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/test/java/ru/javaops/topjava/web/MatcherFactory.java b/src/test/java/ru/javaops/topjava/web/MatcherFactory.java
+new file mode 100644
+--- /dev/null	(date 1672000152677)
++++ b/src/test/java/ru/javaops/topjava/web/MatcherFactory.java	(date 1672000152677)
+@@ -0,0 +1,83 @@
++package ru.javaops.topjava.web;
++
++import org.springframework.test.web.servlet.MvcResult;
++import org.springframework.test.web.servlet.ResultActions;
++import org.springframework.test.web.servlet.ResultMatcher;
++import ru.javaops.topjava.util.JsonUtil;
++
++import java.io.UnsupportedEncodingException;
++import java.util.List;
++import java.util.function.BiConsumer;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++/**
++ * Factory for creating test matchers.
++ * <p>
++ * Comparing actual and expected objects via AssertJ
++ * Support converting json MvcResult to objects for comparation.
++ */
++public class MatcherFactory {
++
++    public static <T> Matcher<T> usingAssertions(Class<T> clazz, BiConsumer<T, T> assertion, BiConsumer<Iterable<T>, Iterable<T>> iterableAssertion) {
++        return new Matcher<>(clazz, assertion, iterableAssertion);
++    }
++
++    public static <T> Matcher<T> usingEqualsComparator(Class<T> clazz) {
++        return usingAssertions(clazz,
++                (a, e) -> assertThat(a).isEqualTo(e),
++                (a, e) -> assertThat(a).isEqualTo(e));
++    }
++
++    public static <T> Matcher<T> usingIgnoringFieldsComparator(Class<T> clazz, String... fieldsToIgnore) {
++        return usingAssertions(clazz,
++                (a, e) -> assertThat(a).usingRecursiveComparison().ignoringFields(fieldsToIgnore).isEqualTo(e),
++                (a, e) -> assertThat(a).usingRecursiveFieldByFieldElementComparatorIgnoringFields(fieldsToIgnore).isEqualTo(e));
++    }
++
++    public static class Matcher<T> {
++        private final Class<T> clazz;
++        private final BiConsumer<T, T> assertion;
++        private final BiConsumer<Iterable<T>, Iterable<T>> iterableAssertion;
++
++        private Matcher(Class<T> clazz, BiConsumer<T, T> assertion, BiConsumer<Iterable<T>, Iterable<T>> iterableAssertion) {
++            this.clazz = clazz;
++            this.assertion = assertion;
++            this.iterableAssertion = iterableAssertion;
++        }
++
++        public void assertMatch(T actual, T expected) {
++            assertion.accept(actual, expected);
++        }
++
++        @SafeVarargs
++        public final void assertMatch(Iterable<T> actual, T... expected) {
++            assertMatch(actual, List.of(expected));
++        }
++
++        public void assertMatch(Iterable<T> actual, Iterable<T> expected) {
++            iterableAssertion.accept(actual, expected);
++        }
++
++        public ResultMatcher contentJson(T expected) {
++            return result -> assertMatch(JsonUtil.readValue(getContent(result), clazz), expected);
++        }
++
++        @SafeVarargs
++        public final ResultMatcher contentJson(T... expected) {
++            return contentJson(List.of(expected));
++        }
++
++        public ResultMatcher contentJson(Iterable<T> expected) {
++            return result -> assertMatch(JsonUtil.readValues(getContent(result), clazz), expected);
++        }
++
++        public T readFromJson(ResultActions action) throws UnsupportedEncodingException {
++            return JsonUtil.readValue(getContent(action.andReturn()), clazz);
++        }
++
++        private static String getContent(MvcResult result) throws UnsupportedEncodingException {
++            return result.getResponse().getContentAsString();
++        }
++    }
++}
+Index: src/test/java/ru/javaops/topjava/web/AbstractControllerTest.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/test/java/ru/javaops/topjava/web/AbstractControllerTest.java b/src/test/java/ru/javaops/topjava/web/AbstractControllerTest.java
+new file mode 100644
+--- /dev/null	(date 1672000152672)
++++ b/src/test/java/ru/javaops/topjava/web/AbstractControllerTest.java	(date 1672000152672)
+@@ -0,0 +1,26 @@
++package ru.javaops.topjava.web;
++
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.test.context.ActiveProfiles;
++import org.springframework.test.web.servlet.MockMvc;
++import org.springframework.test.web.servlet.ResultActions;
++import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
++import org.springframework.transaction.annotation.Transactional;
++
++//https://docs.spring.io/spring-boot/docs/current/reference/html/spring-boot-features.html#boot-features-testing-spring-boot-applications
++@SpringBootTest
++@Transactional
++@AutoConfigureMockMvc
++@ActiveProfiles("test")
++//https://docs.spring.io/spring-boot/docs/current/reference/html/spring-boot-features.html#boot-features-testing-spring-boot-applications-testing-with-mock-environment
++public abstract class AbstractControllerTest {
++
++    @Autowired
++    private MockMvc mockMvc;
++
++    protected ResultActions perform(MockHttpServletRequestBuilder builder) throws Exception {
++        return mockMvc.perform(builder);
++    }
++}
+Index: src/main/java/ru/javaops/topjava/config/SecurityConfiguration.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/config/SecurityConfiguration.java b/src/main/java/ru/javaops/topjava/config/SecurityConfiguration.java
+new file mode 100644
+--- /dev/null	(date 1672001687087)
++++ b/src/main/java/ru/javaops/topjava/config/SecurityConfiguration.java	(date 1672001687087)
+@@ -0,0 +1,67 @@
++package ru.javaops.topjava.config;
++
++import lombok.AllArgsConstructor;
++import lombok.extern.slf4j.Slf4j;
++import org.springframework.context.annotation.Bean;
++import org.springframework.context.annotation.Configuration;
++import org.springframework.http.HttpMethod;
++import org.springframework.security.config.annotation.web.builders.HttpSecurity;
++import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
++import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
++import org.springframework.security.config.http.SessionCreationPolicy;
++import org.springframework.security.core.userdetails.UserDetailsService;
++import org.springframework.security.core.userdetails.UsernameNotFoundException;
++import org.springframework.security.crypto.factory.PasswordEncoderFactories;
++import org.springframework.security.crypto.password.PasswordEncoder;
++import org.springframework.security.web.SecurityFilterChain;
++import ru.javaops.topjava.model.Role;
++import ru.javaops.topjava.model.User;
++import ru.javaops.topjava.repository.UserRepository;
++import ru.javaops.topjava.web.AuthUser;
++
++import java.util.Optional;
++
++@Configuration
++@EnableWebSecurity
++@Slf4j
++@AllArgsConstructor
++//https://stackoverflow.com/questions/72493425/548473
++public class SecurityConfiguration {
++    public static final PasswordEncoder PASSWORD_ENCODER = PasswordEncoderFactories.createDelegatingPasswordEncoder();
++
++    private final UserRepository userRepository;
++
++    @Bean
++    public PasswordEncoder passwordEncoder() {
++        return PASSWORD_ENCODER;
++    }
++
++    @Bean
++    public UserDetailsService userDetailsService() {
++        return email -> {
++            log.debug("Authenticating '{}'", email);
++            Optional<User> optionalUser = userRepository.findByEmailIgnoreCase(email);
++            return new AuthUser(optionalUser.orElseThrow(
++                    () -> new UsernameNotFoundException("User '" + email + "' was not found")));
++        };
++    }
++
++    //  https://spring.io/blog/2022/02/21/spring-security-without-the-websecurityconfigureradapter#configuring-websecurity
++    //  https://stackoverflow.com/a/61147599/548473
++    @Bean
++    public WebSecurityCustomizer webSecurityCustomizer() {
++        return web -> web.ignoring().requestMatchers("/", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**");
++    }
++
++    @Bean
++    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
++        http.authorizeHttpRequests()
++                .requestMatchers("/api/admin/**").hasRole(Role.ADMIN.name())
++                .requestMatchers(HttpMethod.POST, "/api/register").anonymous()
++                .requestMatchers("/api/**").authenticated()
++                .and().httpBasic()
++                .and().sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
++                .and().csrf().disable();
++        return http.build();
++    }
++}
+\ No newline at end of file
+Index: pom.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/pom.xml b/pom.xml
+--- a/pom.xml	(revision 9f0638bb4205e957b68aa5da817d56102d10ab5d)
++++ b/pom.xml	(date 1672001090430)
+@@ -1,44 +1,124 @@
++<?xml version="1.0" encoding="UTF-8"?>
+ <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
++         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+     <modelVersion>4.0.0</modelVersion>
+-
+-    <groupId>ru.javawebinar</groupId>
+-    <artifactId>topjava</artifactId>
+-    <packaging>jar</packaging>
+-
+-    <version>1.0-SNAPSHOT</version>
+-
+-    <name>Calories Management</name>
+-    <url>http://topjava.herokuapp.com/</url>
++    <parent>
++        <groupId>org.springframework.boot</groupId>
++        <artifactId>spring-boot-starter-parent</artifactId>
++        <version>3.0.0</version>
++        <relativePath/> <!-- lookup parent from repository -->
++    </parent>
++    <groupId>ru.javaops</groupId>
++    <artifactId>topjava-boot</artifactId>
++    <version>1.0</version>
++    <name>TopJava Boot</name>
++    <description>Calories Management application (TopJava) Spring Boot migration</description>
+ 
+     <properties>
+-        <java.version>1.8</java.version>
++        <java.version>17</java.version>
++        <springdoc.version>2.0.0</springdoc.version>
+         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+     </properties>
+ 
++    <dependencies>
++        <dependency>
++            <groupId>org.springframework.boot</groupId>
++            <artifactId>spring-boot-starter-data-jpa</artifactId>
++        </dependency>
++        <dependency>
++            <groupId>org.springframework.boot</groupId>
++            <artifactId>spring-boot-starter-web</artifactId>
++        </dependency>
++        <dependency>
++            <groupId>org.springframework.boot</groupId>
++            <artifactId>spring-boot-starter-validation</artifactId>
++        </dependency>
++        <dependency>
++            <groupId>org.springframework.boot</groupId>
++            <artifactId>spring-boot-starter-security</artifactId>
++        </dependency>
++
++        <!--        jackson-->
++        <dependency>
++            <groupId>com.fasterxml.jackson.datatype</groupId>
++            <artifactId>jackson-datatype-hibernate5-jakarta</artifactId>
++        </dependency>
++
++        <!--Swagger-->
++        <dependency>
++            <groupId>org.springdoc</groupId>
++            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
++            <version>${springdoc.version}</version>
++        </dependency>
++
++        <!--cache-->
++        <dependency>
++            <groupId>org.springframework.boot</groupId>
++            <artifactId>spring-boot-starter-cache</artifactId>
++        </dependency>
++        <dependency>
++            <groupId>com.github.ben-manes.caffeine</groupId>
++            <artifactId>caffeine</artifactId>
++        </dependency>
++
++        <dependency>
++            <groupId>com.h2database</groupId>
++            <artifactId>h2</artifactId>
++        </dependency>
++        <dependency>
++            <groupId>org.projectlombok</groupId>
++            <artifactId>lombok</artifactId>
++            <optional>true</optional>
++        </dependency>
++        <dependency>
++            <groupId>org.jsoup</groupId>
++            <artifactId>jsoup</artifactId>
++            <version>1.15.3</version>
++        </dependency>
++
++        <!--    https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-2.4-Release-Notes#junit-5s-vintage-engine-removed-from-spring-boot-starter-test-->
++        <dependency>
++            <groupId>org.springframework.boot</groupId>
++            <artifactId>spring-boot-starter-test</artifactId>
++            <scope>test</scope>
++        </dependency>
++        <!--        https://www.baeldung.com/spring-security-integration-tests        -->
++        <dependency>
++            <groupId>org.springframework.security</groupId>
++            <artifactId>spring-security-test</artifactId>
++            <scope>test</scope>
++        </dependency>
++        <!--        https://youtrack.jetbrains.com/issue/IDEA-231927-->
++        <dependency>
++            <groupId>org.junit.platform</groupId>
++            <artifactId>junit-platform-launcher</artifactId>
++            <scope>test</scope>
++        </dependency>
++    </dependencies>
++
+     <build>
+-        <finalName>topjava</finalName>
+-        <defaultGoal>install</defaultGoal>
+         <plugins>
+             <plugin>
++                <groupId>org.springframework.boot</groupId>
++                <artifactId>spring-boot-maven-plugin</artifactId>
++                <configuration>
++                    <excludes>
++                        <exclude>
++                            <groupId>org.projectlombok</groupId>
++                            <artifactId>lombok</artifactId>
++                        </exclude>
++                    </excludes>
++                </configuration>
++            </plugin>
++            <plugin>
++                <!--https://junit.org/junit5/docs/current/user-guide/#running-tests-build-maven -->
+                 <groupId>org.apache.maven.plugins</groupId>
+-                <artifactId>maven-compiler-plugin</artifactId>
+-                <version>3.8.1</version>
++                <artifactId>maven-surefire-plugin</artifactId>
+                 <configuration>
+-                    <source>${java.version}</source>
+-                    <target>${java.version}</target>
++                    <argLine>-Dfile.encoding=UTF-8</argLine>
+                 </configuration>
+             </plugin>
+         </plugins>
+     </build>
+-
+-    <dependencies>
+-    </dependencies>
+-
+-    <profiles>
+-    </profiles>
+-
+-    <dependencyManagement>
+-    </dependencyManagement>
+ </project>
+Index: src/main/java/ru/javaops/topjava/config/OpenApiConfig.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/config/OpenApiConfig.java b/src/main/java/ru/javaops/topjava/config/OpenApiConfig.java
+new file mode 100644
+--- /dev/null	(date 1672001370582)
++++ b/src/main/java/ru/javaops/topjava/config/OpenApiConfig.java	(date 1672001370582)
+@@ -0,0 +1,44 @@
++package ru.javaops.topjava.config;
++
++import io.swagger.v3.oas.annotations.OpenAPIDefinition;
++import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
++import io.swagger.v3.oas.annotations.info.Contact;
++import io.swagger.v3.oas.annotations.info.Info;
++import io.swagger.v3.oas.annotations.security.SecurityRequirement;
++import io.swagger.v3.oas.annotations.security.SecurityScheme;
++import org.springdoc.core.models.GroupedOpenApi;
++import org.springframework.context.annotation.Bean;
++import org.springframework.context.annotation.Configuration;
++
++@Configuration
++//https://sabljakovich.medium.com/adding-basic-auth-authorization-option-to-openapi-swagger-documentation-java-spring-95abbede27e9
++@SecurityScheme(
++        name = "basicAuth",
++        type = SecuritySchemeType.HTTP,
++        scheme = "basic"
++)
++@OpenAPIDefinition(
++        info = @Info(
++                title = "REST API documentation",
++                version = "1.0",
++                description = """
++                        Calories Management application (<a href='https://javaops.ru/view/topjava'>TopJava</a>) Spring Boot migration
++                        <p><b>Тестовые креденшелы:</b><br>
++                        - user@yandex.ru / password<br>
++                        - admin@gmail.com / admin<br>
++                        - guest@gmail.com / guest</p>
++                        """,
++                contact = @Contact(url = "https://javaops.ru/#contacts", name = "Grigory Kislin", email = "admin@javaops.ru")
++        ),
++        security = @SecurityRequirement(name = "basicAuth")
++)
++public class OpenApiConfig {
++
++    @Bean
++    public GroupedOpenApi api() {
++        return GroupedOpenApi.builder()
++                .group("REST API")
++                .pathsToMatch("/api/**")
++                .build();
++    }
++}
+Index: src/main/java/ru/javaops/topjava/config/AppConfig.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/config/AppConfig.java b/src/main/java/ru/javaops/topjava/config/AppConfig.java
+new file mode 100644
+--- /dev/null	(date 1672001218141)
++++ b/src/main/java/ru/javaops/topjava/config/AppConfig.java	(date 1672001218141)
+@@ -0,0 +1,50 @@
++package ru.javaops.topjava.config;
++
++import com.fasterxml.jackson.annotation.JsonAnyGetter;
++import com.fasterxml.jackson.annotation.JsonAutoDetect;
++import com.fasterxml.jackson.databind.ObjectMapper;
++import com.fasterxml.jackson.datatype.hibernate5.jakarta.Hibernate5JakartaModule;
++import lombok.extern.slf4j.Slf4j;
++import org.h2.tools.Server;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.cache.annotation.EnableCaching;
++import org.springframework.context.annotation.Bean;
++import org.springframework.context.annotation.Configuration;
++import org.springframework.context.annotation.Profile;
++import org.springframework.http.ProblemDetail;
++import ru.javaops.topjava.util.JsonUtil;
++
++import java.sql.SQLException;
++import java.util.Map;
++
++import static com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.ANY;
++import static com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.NONE;
++
++@Configuration
++@Slf4j
++@EnableCaching
++// TODO: cache only most requested data!
++public class AppConfig {
++
++    @Profile("!test")
++    @Bean(initMethod = "start", destroyMethod = "stop")
++    Server h2Server() throws SQLException {
++        log.info("Start H2 TCP server");
++        return Server.createTcpServer("-tcp", "-tcpAllowOthers", "-tcpPort", "9092");
++    }
++
++    //    https://stackoverflow.com/a/74630129/548473
++    @JsonAutoDetect(fieldVisibility = NONE, getterVisibility = ANY)
++    interface MixIn {
++        @JsonAnyGetter
++        Map<String, Object> getProperties();
++    }
++
++    @Autowired
++    void configureAndStoreObjectMapper(ObjectMapper objectMapper) {
++        objectMapper.registerModule(new Hibernate5JakartaModule());
++        // https://stackoverflow.com/questions/7421474/548473
++        objectMapper.addMixIn(ProblemDetail.class, MixIn.class);
++        JsonUtil.setMapper(objectMapper);
++    }
++}
+Index: src/main/java/ru/javaops/topjava/error/IllegalRequestDataException.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/error/IllegalRequestDataException.java b/src/main/java/ru/javaops/topjava/error/IllegalRequestDataException.java
+new file mode 100644
+--- /dev/null	(date 1672001793234)
++++ b/src/main/java/ru/javaops/topjava/error/IllegalRequestDataException.java	(date 1672001793234)
+@@ -0,0 +1,9 @@
++package ru.javaops.topjava.error;
++
++import org.springframework.http.HttpStatus;
++
++public class IllegalRequestDataException extends AppException {
++    public IllegalRequestDataException(String msg) {
++        super(HttpStatus.UNPROCESSABLE_ENTITY, msg);
++    }
++}
+\ No newline at end of file
+Index: src/main/java/ru/javaops/topjava/error/AppException.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/error/AppException.java b/src/main/java/ru/javaops/topjava/error/AppException.java
+new file mode 100644
+--- /dev/null	(date 1672001793230)
++++ b/src/main/java/ru/javaops/topjava/error/AppException.java	(date 1672001793230)
+@@ -0,0 +1,18 @@
++package ru.javaops.topjava.error;
++
++import lombok.Getter;
++import org.springframework.http.HttpStatus;
++import org.springframework.web.server.ResponseStatusException;
++
++@Getter
++public class AppException extends ResponseStatusException {
++
++    public AppException(HttpStatus status, String message) {
++        super(status, message);
++    }
++
++    @Override
++    public String getMessage() {
++        return getReason();
++    }
++}
+Index: src/main/java/ru/javaops/topjava/model/User.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/model/User.java b/src/main/java/ru/javaops/topjava/model/User.java
+new file mode 100644
+--- /dev/null	(date 1672059957919)
++++ b/src/main/java/ru/javaops/topjava/model/User.java	(date 1672059957919)
+@@ -0,0 +1,89 @@
++package ru.javaops.topjava.model;
++
++import com.fasterxml.jackson.annotation.JsonProperty;
++import jakarta.persistence.*;
++import jakarta.validation.constraints.Email;
++import jakarta.validation.constraints.NotBlank;
++import jakarta.validation.constraints.NotNull;
++import jakarta.validation.constraints.Size;
++import lombok.AccessLevel;
++import lombok.Getter;
++import lombok.NoArgsConstructor;
++import lombok.Setter;
++import org.hibernate.annotations.OnDelete;
++import org.hibernate.annotations.OnDeleteAction;
++import org.springframework.util.CollectionUtils;
++import ru.javaops.topjava.HasIdAndEmail;
++import ru.javaops.topjava.util.validation.NoHtml;
++
++import java.io.Serial;
++import java.io.Serializable;
++import java.util.*;
++
++@Entity
++@Table(name = "users")
++@Getter
++@Setter
++@NoArgsConstructor(access = AccessLevel.PROTECTED)
++public class User extends NamedEntity implements HasIdAndEmail, Serializable {
++    @Serial
++    private static final long serialVersionUID = 1L;
++
++    @Column(name = "email", nullable = false, unique = true)
++    @Email
++    @NotBlank
++    @Size(max = 128)
++    @NoHtml   // https://stackoverflow.com/questions/17480809
++    private String email;
++
++    @Column(name = "password", nullable = false)
++    @NotBlank
++    @Size(max = 256)
++    // https://stackoverflow.com/a/12505165/548473
++    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
++    private String password;
++
++    @Column(name = "enabled", nullable = false, columnDefinition = "bool default true")
++    private boolean enabled = true;
++
++    @Column(name = "registered", nullable = false, columnDefinition = "timestamp default now()", updatable = false)
++    @NotNull
++    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
++    private Date registered = new Date();
++
++    @Enumerated(EnumType.STRING)
++    @CollectionTable(name = "user_role",
++            joinColumns = @JoinColumn(name = "user_id"),
++            uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "role"}, name = "uk_user_role"))
++    @Column(name = "role")
++    @ElementCollection(fetch = FetchType.EAGER)
++    @JoinColumn
++    @OnDelete(action = OnDeleteAction.CASCADE)
++    private Set<Role> roles;
++
++    public User(User u) {
++        this(u.id, u.name, u.email, u.password, u.enabled, u.registered, u.roles);
++    }
++
++    public User(Integer id, String name, String email, String password, Role... roles) {
++        this(id, name, email, password, true, new Date(), Arrays.asList(roles));
++    }
++
++    public User(Integer id, String name, String email, String password, boolean enabled, Date registered, Collection<Role> roles) {
++        super(id, name);
++        this.email = email;
++        this.password = password;
++        this.enabled = enabled;
++        this.registered = registered;
++        setRoles(roles);
++    }
++
++    public void setRoles(Collection<Role> roles) {
++        this.roles = CollectionUtils.isEmpty(roles) ? EnumSet.noneOf(Role.class) : EnumSet.copyOf(roles);
++    }
++
++    @Override
++    public String toString() {
++        return "User:" + id + '[' + email + ']';
++    }
++}
+\ No newline at end of file
+Index: src/main/java/ru/javaops/topjava/model/Role.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/model/Role.java b/src/main/java/ru/javaops/topjava/model/Role.java
+new file mode 100644
+--- /dev/null	(date 1672000152458)
++++ b/src/main/java/ru/javaops/topjava/model/Role.java	(date 1672000152458)
+@@ -0,0 +1,14 @@
++package ru.javaops.topjava.model;
++
++import org.springframework.security.core.GrantedAuthority;
++
++public enum Role implements GrantedAuthority {
++    USER,
++    ADMIN;
++
++    @Override
++    public String getAuthority() {
++        //   https://stackoverflow.com/a/19542316/548473
++        return "ROLE_" + name();
++    }
++}
+\ No newline at end of file
+Index: src/main/java/ru/javaops/topjava/model/NamedEntity.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/model/NamedEntity.java b/src/main/java/ru/javaops/topjava/model/NamedEntity.java
+new file mode 100644
+--- /dev/null	(date 1672002109552)
++++ b/src/main/java/ru/javaops/topjava/model/NamedEntity.java	(date 1672002109552)
+@@ -0,0 +1,35 @@
++package ru.javaops.topjava.model;
++
++import jakarta.persistence.Column;
++import jakarta.persistence.MappedSuperclass;
++import jakarta.validation.constraints.NotBlank;
++import jakarta.validation.constraints.Size;
++import lombok.AccessLevel;
++import lombok.Getter;
++import lombok.NoArgsConstructor;
++import lombok.Setter;
++import ru.javaops.topjava.util.validation.NoHtml;
++
++
++@MappedSuperclass
++@Getter
++@Setter
++@NoArgsConstructor(access = AccessLevel.PROTECTED)
++public abstract class NamedEntity extends BaseEntity {
++
++    @NotBlank
++    @Size(min = 2, max = 128)
++    @Column(name = "name", nullable = false)
++    @NoHtml
++    protected String name;
++
++    protected NamedEntity(Integer id, String name) {
++        super(id);
++        this.name = name;
++    }
++
++    @Override
++    public String toString() {
++        return super.toString() + '[' + name + ']';
++    }
++}
+\ No newline at end of file
+Index: src/main/java/ru/javaops/topjava/model/BaseEntity.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/model/BaseEntity.java b/src/main/java/ru/javaops/topjava/model/BaseEntity.java
+new file mode 100644
+--- /dev/null	(date 1672008563106)
++++ b/src/main/java/ru/javaops/topjava/model/BaseEntity.java	(date 1672008563106)
+@@ -0,0 +1,58 @@
++package ru.javaops.topjava.model;
++
++import io.swagger.v3.oas.annotations.media.Schema;
++import jakarta.persistence.*;
++import lombok.*;
++import org.springframework.data.domain.Persistable;
++import org.springframework.data.util.ProxyUtils;
++import org.springframework.util.Assert;
++import ru.javaops.topjava.HasId;
++
++@MappedSuperclass
++//  https://stackoverflow.com/a/6084701/548473
++@Access(AccessType.FIELD)
++@Getter
++@Setter
++@NoArgsConstructor(access = AccessLevel.PROTECTED)
++@AllArgsConstructor(access = AccessLevel.PROTECTED)
++public abstract class BaseEntity implements Persistable<Integer>, HasId {
++
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    @Schema(hidden = true)
++    protected Integer id;
++
++    // doesn't work for hibernate lazy proxy
++    public int id() {
++        Assert.notNull(id, "Entity must have id");
++        return id;
++    }
++
++    @Override
++    public boolean isNew() {
++        return id == null;
++    }
++
++    //    https://stackoverflow.com/questions/1638723
++    @Override
++    public boolean equals(Object o) {
++        if (this == o) {
++            return true;
++        }
++        if (o == null || !getClass().equals(ProxyUtils.getUserClass(o))) {
++            return false;
++        }
++        BaseEntity that = (BaseEntity) o;
++        return id != null && id.equals(that.id);
++    }
++
++    @Override
++    public int hashCode() {
++        return id == null ? 0 : id;
++    }
++
++    @Override
++    public String toString() {
++        return getClass().getSimpleName() + ":" + id;
++    }
++}
+\ No newline at end of file
+Index: src/main/java/ru/javaops/topjava/repository/UserRepository.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/repository/UserRepository.java b/src/main/java/ru/javaops/topjava/repository/UserRepository.java
+new file mode 100644
+--- /dev/null	(date 1672059957919)
++++ b/src/main/java/ru/javaops/topjava/repository/UserRepository.java	(date 1672059957919)
+@@ -0,0 +1,14 @@
++package ru.javaops.topjava.repository;
++
++import org.springframework.data.jpa.repository.Query;
++import org.springframework.transaction.annotation.Transactional;
++import ru.javaops.topjava.model.User;
++
++import java.util.Optional;
++
++@Transactional(readOnly = true)
++public interface UserRepository extends BaseRepository<User> {
++
++    @Query("SELECT u FROM User u WHERE u.email = LOWER(:email)")
++    Optional<User> findByEmailIgnoreCase(String email);
++}
+\ No newline at end of file
+Index: src/main/java/ru/javaops/topjava/repository/BaseRepository.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/repository/BaseRepository.java b/src/main/java/ru/javaops/topjava/repository/BaseRepository.java
+new file mode 100644
+--- /dev/null	(date 1672000152467)
++++ b/src/main/java/ru/javaops/topjava/repository/BaseRepository.java	(date 1672000152467)
+@@ -0,0 +1,32 @@
++package ru.javaops.topjava.repository;
++
++import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.data.jpa.repository.Modifying;
++import org.springframework.data.jpa.repository.Query;
++import org.springframework.data.repository.NoRepositoryBean;
++import org.springframework.transaction.annotation.Transactional;
++
++import static ru.javaops.topjava.util.validation.ValidationUtil.checkExisted;
++import static ru.javaops.topjava.util.validation.ValidationUtil.checkModification;
++
++// https://stackoverflow.com/questions/42781264/multiple-base-repositories-in-spring-data-jpa
++@NoRepositoryBean
++public interface BaseRepository<T> extends JpaRepository<T, Integer> {
++
++    //    https://docs.spring.io/spring-data/jpa/docs/current/reference/html/#jpa.query.spel-expressions
++    @Transactional
++    @Modifying
++    @Query("DELETE FROM #{#entityName} e WHERE e.id=:id")
++    int delete(int id);
++
++    default void deleteExisted(int id) {
++        checkModification(delete(id), id);
++    }
++
++    @Query("SELECT e FROM #{#entityName} e WHERE e.id = :id")
++    T get(int id);
++
++    default T getExisted(int id) {
++        return checkExisted(get(id), id);
++    }
++}
+\ No newline at end of file
+Index: src/main/java/ru/javaops/topjava/to/UserTo.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/to/UserTo.java b/src/main/java/ru/javaops/topjava/to/UserTo.java
+new file mode 100644
+--- /dev/null	(date 1672059957919)
++++ b/src/main/java/ru/javaops/topjava/to/UserTo.java	(date 1672059957919)
+@@ -0,0 +1,34 @@
++package ru.javaops.topjava.to;
++
++import jakarta.validation.constraints.Email;
++import jakarta.validation.constraints.NotBlank;
++import jakarta.validation.constraints.Size;
++import lombok.EqualsAndHashCode;
++import lombok.Value;
++import ru.javaops.topjava.HasIdAndEmail;
++import ru.javaops.topjava.util.validation.NoHtml;
++
++@Value
++@EqualsAndHashCode(callSuper = true)
++public class UserTo extends NamedTo implements HasIdAndEmail {
++    @Email
++    @NotBlank
++    @Size(max = 128)
++    @NoHtml  // https://stackoverflow.com/questions/17480809
++    String email;
++
++    @NotBlank
++    @Size(min = 5, max = 32)
++    String password;
++
++    public UserTo(Integer id, String name, String email, String password) {
++        super(id, name);
++        this.email = email;
++        this.password = password;
++    }
++
++    @Override
++    public String toString() {
++        return "UserTo:" + id + '[' + email + ']';
++    }
++}
+Index: src/main/java/ru/javaops/topjava/to/NamedTo.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/to/NamedTo.java b/src/main/java/ru/javaops/topjava/to/NamedTo.java
+new file mode 100644
+--- /dev/null	(date 1672002404174)
++++ b/src/main/java/ru/javaops/topjava/to/NamedTo.java	(date 1672002404174)
+@@ -0,0 +1,26 @@
++package ru.javaops.topjava.to;
++
++import jakarta.validation.constraints.NotBlank;
++import jakarta.validation.constraints.Size;
++import lombok.Data;
++import lombok.EqualsAndHashCode;
++import ru.javaops.topjava.util.validation.NoHtml;
++
++@Data
++@EqualsAndHashCode(callSuper = true)
++public class NamedTo extends BaseTo {
++    @NotBlank
++    @Size(min = 2, max = 128)
++    @NoHtml
++    protected String name;
++
++    public NamedTo(Integer id, String name) {
++        super(id);
++        this.name = name;
++    }
++
++    @Override
++    public String toString() {
++        return super.toString() + '[' + name + ']';
++    }
++}
+Index: src/main/java/ru/javaops/topjava/to/BaseTo.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/to/BaseTo.java b/src/main/java/ru/javaops/topjava/to/BaseTo.java
+new file mode 100644
+--- /dev/null	(date 1672002318463)
++++ b/src/main/java/ru/javaops/topjava/to/BaseTo.java	(date 1672002318463)
+@@ -0,0 +1,21 @@
++package ru.javaops.topjava.to;
++
++import io.swagger.v3.oas.annotations.media.Schema;
++import lombok.AccessLevel;
++import lombok.AllArgsConstructor;
++import lombok.Data;
++import lombok.NoArgsConstructor;
++import ru.javaops.topjava.HasId;
++
++@NoArgsConstructor
++@AllArgsConstructor(access = AccessLevel.PROTECTED)
++@Data
++public abstract class BaseTo implements HasId {
++    @Schema(hidden = true)
++    protected Integer id;
++
++    @Override
++    public String toString() {
++        return getClass().getSimpleName() + ":" + id;
++    }
++}
+Index: src/main/java/ru/javaops/topjava/util/validation/ValidationUtil.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/util/validation/ValidationUtil.java b/src/main/java/ru/javaops/topjava/util/validation/ValidationUtil.java
+new file mode 100644
+--- /dev/null	(date 1672002494172)
++++ b/src/main/java/ru/javaops/topjava/util/validation/ValidationUtil.java	(date 1672002494172)
+@@ -0,0 +1,46 @@
++package ru.javaops.topjava.util.validation;
++
++import lombok.experimental.UtilityClass;
++import org.springframework.core.NestedExceptionUtils;
++import org.springframework.lang.NonNull;
++import ru.javaops.topjava.HasId;
++import ru.javaops.topjava.error.IllegalRequestDataException;
++
++@UtilityClass
++public class ValidationUtil {
++
++    public static void checkNew(HasId bean) {
++        if (!bean.isNew()) {
++            throw new IllegalRequestDataException(bean.getClass().getSimpleName() + " must be new (id=null)");
++        }
++    }
++
++    //  Conservative when you reply, but accept liberally (http://stackoverflow.com/a/32728226/548473)
++    public static void assureIdConsistent(HasId bean, int id) {
++        if (bean.isNew()) {
++            bean.setId(id);
++        } else if (bean.id() != id) {
++            throw new IllegalRequestDataException(bean.getClass().getSimpleName() + " must has id=" + id);
++        }
++    }
++
++    public static void checkModification(int count, int id) {
++        if (count == 0) {
++            throw new IllegalRequestDataException("Entity with id=" + id + " not found");
++        }
++    }
++
++    public static <T> T checkExisted(T obj, int id) {
++        if (obj == null) {
++            throw new IllegalRequestDataException("Entity with id=" + id + " not found");
++        }
++        return obj;
++    }
++
++    //  https://stackoverflow.com/a/65442410/548473
++    @NonNull
++    public static Throwable getRootCause(@NonNull Throwable t) {
++        Throwable rootCause = NestedExceptionUtils.getRootCause(t);
++        return rootCause != null ? rootCause : t;
++    }
++}
+\ No newline at end of file
+Index: src/main/java/ru/javaops/topjava/util/validation/NoHtmlValidator.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/util/validation/NoHtmlValidator.java b/src/main/java/ru/javaops/topjava/util/validation/NoHtmlValidator.java
+new file mode 100644
+--- /dev/null	(date 1672002476030)
++++ b/src/main/java/ru/javaops/topjava/util/validation/NoHtmlValidator.java	(date 1672002476030)
+@@ -0,0 +1,13 @@
++package ru.javaops.topjava.util.validation;
++
++import jakarta.validation.ConstraintValidator;
++import jakarta.validation.ConstraintValidatorContext;
++import org.jsoup.Jsoup;
++import org.jsoup.safety.Safelist;
++
++public class NoHtmlValidator implements ConstraintValidator<NoHtml, String> {
++    @Override
++    public boolean isValid(String value, ConstraintValidatorContext ctx) {
++        return value == null || Jsoup.isValid(value, Safelist.none());
++    }
++}
+Index: src/main/java/ru/javaops/topjava/util/validation/NoHtml.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javaops/topjava/util/validation/NoHtml.java b/src/main/java/ru/javaops/topjava/util/validation/NoHtml.java
+new file mode 100644
+--- /dev/null	(date 1672002455309)
++++ b/src/main/java/ru/javaops/topjava/util/validation/NoHtml.java	(date 1672002455309)
+@@ -0,0 +1,24 @@
++package ru.javaops.topjava.util.validation;
++
++import jakarta.validation.Constraint;
++import jakarta.validation.Payload;
++
++import java.lang.annotation.Documented;
++import java.lang.annotation.Retention;
++import java.lang.annotation.Target;
++
++import static java.lang.annotation.ElementType.FIELD;
++import static java.lang.annotation.ElementType.METHOD;
++import static java.lang.annotation.RetentionPolicy.RUNTIME;
++
++@Documented
++@Constraint(validatedBy = NoHtmlValidator.class)
++@Target({METHOD, FIELD})
++@Retention(RUNTIME)
++public @interface NoHtml {
++    String message() default "{error.noHtml}";
++
++    Class<?>[] groups() default {};
++
++    Class<? extends Payload>[] payload() default {};
++}

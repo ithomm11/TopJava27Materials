@@ -1,0 +1,81 @@
+Index: src/test/java/ru/javawebinar/topjava/SpringMain.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/test/java/ru/javawebinar/topjava/SpringMain.java b/src/test/java/ru/javawebinar/topjava/SpringMain.java
+--- a/src/test/java/ru/javawebinar/topjava/SpringMain.java	(revision 8604356bb13976d8bf89894e67b83ac792c266ae)
++++ b/src/test/java/ru/javawebinar/topjava/SpringMain.java	(date 1669848259255)
+@@ -1,6 +1,7 @@
+ package ru.javawebinar.topjava;
+ 
+-import org.springframework.context.support.GenericXmlApplicationContext;
++import org.springframework.context.ConfigurableApplicationContext;
++import org.springframework.context.support.ClassPathXmlApplicationContext;
+ import ru.javawebinar.topjava.model.Role;
+ import ru.javawebinar.topjava.model.User;
+ import ru.javawebinar.topjava.to.MealTo;
+@@ -16,11 +17,7 @@
+ public class SpringMain {
+     public static void main(String[] args) {
+         // java 7 automatic resource management (ARM)
+-        try (GenericXmlApplicationContext appCtx = new GenericXmlApplicationContext()) {
+-            appCtx.getEnvironment().setActiveProfiles(Profiles.getActiveDbProfile(), Profiles.REPOSITORY_IMPLEMENTATION);
+-            appCtx.load("spring/inmemory.xml");
+-            appCtx.refresh();
+-
++        try (ConfigurableApplicationContext appCtx = new ClassPathXmlApplicationContext("spring/inmemory.xml")) {
+             System.out.println("Bean definition names: " + Arrays.toString(appCtx.getBeanDefinitionNames()));
+             AdminRestController adminUserController = appCtx.getBean(AdminRestController.class);
+             adminUserController.create(new User(null, "userName", "email@mail.ru", "password", Role.ADMIN));
+Index: src/main/java/ru/javawebinar/topjava/web/meal/JspMealController.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javawebinar/topjava/web/meal/JspMealController.java b/src/main/java/ru/javawebinar/topjava/web/meal/JspMealController.java
+--- a/src/main/java/ru/javawebinar/topjava/web/meal/JspMealController.java	(revision 8604356bb13976d8bf89894e67b83ac792c266ae)
++++ b/src/main/java/ru/javawebinar/topjava/web/meal/JspMealController.java	(date 1669848373012)
+@@ -35,7 +35,7 @@
+ 
+     @GetMapping("/create")
+     public String create(Model model) {
+-        model.addAttribute("meal", new Meal(LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS), "", 1000));
++        model.addAttribute("meal", new Meal(LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES), "", 1000));
+         return "mealForm";
+     }
+ 
+Index: src/test/java/ru/javawebinar/topjava/web/user/AdminRestControllerTest.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/test/java/ru/javawebinar/topjava/web/user/AdminRestControllerTest.java b/src/test/java/ru/javawebinar/topjava/web/user/AdminRestControllerTest.java
+--- a/src/test/java/ru/javawebinar/topjava/web/user/AdminRestControllerTest.java	(revision 8604356bb13976d8bf89894e67b83ac792c266ae)
++++ b/src/test/java/ru/javawebinar/topjava/web/user/AdminRestControllerTest.java	(date 1669848326953)
+@@ -5,7 +5,6 @@
+ import org.springframework.http.MediaType;
+ import org.springframework.test.web.servlet.ResultActions;
+ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+-import ru.javawebinar.topjava.UserTestData;
+ import ru.javawebinar.topjava.model.User;
+ import ru.javawebinar.topjava.service.UserService;
+ import ru.javawebinar.topjava.util.exception.NotFoundException;
+@@ -53,7 +52,7 @@
+ 
+     @Test
+     void update() throws Exception {
+-        User updated = UserTestData.getUpdated();
++        User updated = getUpdated();
+         perform(MockMvcRequestBuilders.put(REST_URL + USER_ID)
+                 .contentType(MediaType.APPLICATION_JSON)
+                 .content(JsonUtil.writeValue(updated)))
+@@ -64,7 +63,7 @@
+ 
+     @Test
+     void createWithLocation() throws Exception {
+-        User newUser = UserTestData.getNew();
++        User newUser = getNew();
+         ResultActions action = perform(MockMvcRequestBuilders.post(REST_URL)
+                 .contentType(MediaType.APPLICATION_JSON)
+                 .content(JsonUtil.writeValue(newUser)))

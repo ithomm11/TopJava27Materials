@@ -1,0 +1,139 @@
+Index: config/messages/app.properties
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/config/messages/app.properties b/config/messages/app.properties
+--- a/config/messages/app.properties	(revision 6b39e6ff8e565165c64e669f46d42427abf79539)
++++ b/config/messages/app.properties	(date 1671656698120)
+@@ -3,7 +3,7 @@
+ app.description=<a href="https://github.com/JavaOPs/topjava">Java Enterprise project</a> with registration/authorization and role-based access rights (USER, ADMIN). \
+ Admin could create/edit/delete users, users - manage your profile and data (meals) via UI (AJAX) and REST with basic authorization. \
+ Meals could be filtered by date and time. Meal record color depends on daily calories sum exceeding "Daily calorie limit" (editable user's profile paramets). \
+-All REST interface covered with JUnit tests by Spring MVC Test и Spring Security Test.
++All REST interface covered with JUnit tests by Spring MVC Test and Spring Security Test.
+ app.footer=<a href="https://github.com/JavaOPs/topjava" target=_blank>Spring 5/JPA Enterprise (Topjava)</a> internship application
+ app.login=Login as
+ app.profile=profile
+Index: src/test/java/ru/javawebinar/topjava/web/AbstractControllerTest.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/test/java/ru/javawebinar/topjava/web/AbstractControllerTest.java b/src/test/java/ru/javawebinar/topjava/web/AbstractControllerTest.java
+--- a/src/test/java/ru/javawebinar/topjava/web/AbstractControllerTest.java	(revision 6b39e6ff8e565165c64e669f46d42427abf79539)
++++ b/src/test/java/ru/javawebinar/topjava/web/AbstractControllerTest.java	(date 1671656662678)
+@@ -33,9 +33,6 @@
+ 
+     private static final CharacterEncodingFilter CHARACTER_ENCODING_FILTER = new CharacterEncodingFilter();
+ 
+-    @Autowired
+-    public Environment env;
+-
+     static {
+         CHARACTER_ENCODING_FILTER.setEncoding("UTF-8");
+         CHARACTER_ENCODING_FILTER.setForceEncoding(true);
+@@ -43,10 +40,13 @@
+ 
+     private MockMvc mockMvc;
+ 
++    @Autowired
++    private Environment env;
++
+     @Autowired
+     private WebApplicationContext webApplicationContext;
+ 
+-    public void assumeDataJpa() {
++    protected void assumeDataJpa() {
+         Assumptions.assumeTrue(env.acceptsProfiles(org.springframework.core.env.Profiles.of(Profiles.DATAJPA)), "DATA-JPA only");
+     }
+ 
+Index: src/test/java/ru/javawebinar/topjava/web/user/InMemoryAdminRestControllerSpringTest.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/test/java/ru/javawebinar/topjava/web/user/InMemoryAdminRestControllerSpringTest.java b/src/test/java/ru/javawebinar/topjava/web/user/InMemoryAdminRestControllerSpringTest.java
+--- a/src/test/java/ru/javawebinar/topjava/web/user/InMemoryAdminRestControllerSpringTest.java	(revision 6b39e6ff8e565165c64e669f46d42427abf79539)
++++ b/src/test/java/ru/javawebinar/topjava/web/user/InMemoryAdminRestControllerSpringTest.java	(date 1671656698124)
+@@ -21,7 +21,7 @@
+     private InMemoryUserRepository repository;
+ 
+     @BeforeEach
+-    public void setUp() {
++    void setup() {
+         repository.init();
+     }
+ 
+Index: src/main/java/ru/javawebinar/topjava/web/meal/MealRestController.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javawebinar/topjava/web/meal/MealRestController.java b/src/main/java/ru/javawebinar/topjava/web/meal/MealRestController.java
+--- a/src/main/java/ru/javawebinar/topjava/web/meal/MealRestController.java	(revision 6b39e6ff8e565165c64e669f46d42427abf79539)
++++ b/src/main/java/ru/javawebinar/topjava/web/meal/MealRestController.java	(date 1671656662672)
+@@ -56,6 +56,7 @@
+         return ResponseEntity.created(uriOfNewResource).body(created);
+     }
+ 
++    @Override
+     @GetMapping("/filter")
+     public List<MealTo> getBetween(
+             @RequestParam @Nullable LocalDate startDate,
+Index: src/test/java/ru/javawebinar/topjava/web/user/InMemoryAdminRestControllerTest.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/test/java/ru/javawebinar/topjava/web/user/InMemoryAdminRestControllerTest.java b/src/test/java/ru/javawebinar/topjava/web/user/InMemoryAdminRestControllerTest.java
+--- a/src/test/java/ru/javawebinar/topjava/web/user/InMemoryAdminRestControllerTest.java	(revision 6b39e6ff8e565165c64e669f46d42427abf79539)
++++ b/src/test/java/ru/javawebinar/topjava/web/user/InMemoryAdminRestControllerTest.java	(date 1671656698130)
+@@ -36,7 +36,7 @@
+     }
+ 
+     @BeforeEach
+-    public void setup() {
++    void setup() {
+         // re-initialize
+         repository.init();
+     }
+Index: src/main/java/ru/javawebinar/topjava/web/ExceptionInfoHandler.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/ru/javawebinar/topjava/web/ExceptionInfoHandler.java b/src/main/java/ru/javawebinar/topjava/web/ExceptionInfoHandler.java
+--- a/src/main/java/ru/javawebinar/topjava/web/ExceptionInfoHandler.java	(revision 6b39e6ff8e565165c64e669f46d42427abf79539)
++++ b/src/main/java/ru/javawebinar/topjava/web/ExceptionInfoHandler.java	(date 1671656662671)
+@@ -25,12 +25,12 @@
+ @RestControllerAdvice(annotations = RestController.class)
+ @Order(Ordered.HIGHEST_PRECEDENCE + 5)
+ public class ExceptionInfoHandler {
+-    private static Logger log = LoggerFactory.getLogger(ExceptionInfoHandler.class);
++    private static final Logger log = LoggerFactory.getLogger(ExceptionInfoHandler.class);
+ 
+     //  http://stackoverflow.com/a/22358422/548473
+     @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+     @ExceptionHandler(NotFoundException.class)
+-    public ErrorInfo handleError(HttpServletRequest req, NotFoundException e) {
++    public ErrorInfo notFoundError(HttpServletRequest req, NotFoundException e) {
+         return logAndGetErrorInfo(req, e, false, DATA_NOT_FOUND);
+     }
+ 
+@@ -42,13 +42,13 @@
+ 
+     @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)  // 422
+     @ExceptionHandler({IllegalRequestDataException.class, MethodArgumentTypeMismatchException.class, HttpMessageNotReadableException.class})
+-    public ErrorInfo illegalRequestDataError(HttpServletRequest req, Exception e) {
++    public ErrorInfo validationError(HttpServletRequest req, Exception e) {
+         return logAndGetErrorInfo(req, e, false, VALIDATION_ERROR);
+     }
+ 
+     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+     @ExceptionHandler(Exception.class)
+-    public ErrorInfo handleError(HttpServletRequest req, Exception e) {
++    public ErrorInfo internalError(HttpServletRequest req, Exception e) {
+         return logAndGetErrorInfo(req, e, true, APP_ERROR);
+     }
+ 

@@ -1,0 +1,85 @@
+Index: src/main/resources/logback.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/resources/logback.xml b/src/main/resources/logback.xml
+new file mode 100644
+--- /dev/null	(date 1654703892451)
++++ b/src/main/resources/logback.xml	(date 1654703892451)
+@@ -0,0 +1,29 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<configuration scan="true" scanPeriod="30 seconds">
++
++    <!-- To enable JMX Management -->
++    <jmxConfigurator/>
++
++    <appender name="file" class="ch.qos.logback.core.FileAppender">
++        <file>${TOPJAVA_ROOT}/log/topjava.log</file>
++
++        <encoder>
++            <charset>UTF-8</charset>
++            <pattern>%date %-5level %logger{0} [%file:%line] %msg%n</pattern>
++        </encoder>
++    </appender>
++
++    <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
++        <encoder>
++            <charset>UTF-8</charset>
++            <pattern>%-5level %logger{0} [%file:%line] %msg%n</pattern>
++        </encoder>
++    </appender>
++
++    <logger name="ru.javawebinar.topjava" level="debug"/>
++
++    <root level="info">
++        <appender-ref ref="file"/>
++        <appender-ref ref="console"/>
++    </root>
++</configuration>
+\ No newline at end of file
+Index: pom.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/pom.xml b/pom.xml
+--- a/pom.xml	(revision a032548b6ffa0c334ccd7de511bdc59085bab34b)
++++ b/pom.xml	(date 1654697522933)
+@@ -18,6 +18,7 @@
+ 
+         <!-- Logging -->
+         <logback.version>1.2.11</logback.version>
++        <slf4j.version>1.7.36</slf4j.version>
+     </properties>
+ 
+     <build>
+@@ -37,11 +38,21 @@
+     </build>
+ 
+     <dependencies>
++        <!-- Logging with SLF4J & LogBack -->
++        <dependency>
++            <groupId>org.slf4j</groupId>
++            <artifactId>slf4j-api</artifactId>
++            <version>${slf4j.version}</version>
++            <scope>compile</scope>
++        </dependency>
++
+         <dependency>
+             <groupId>ch.qos.logback</groupId>
+             <artifactId>logback-classic</artifactId>
+             <version>${logback.version}</version>
++            <scope>runtime</scope>
+         </dependency>
++
+         <!--Web-->
+         <dependency>
+             <groupId>javax.servlet</groupId>
+@@ -56,4 +67,4 @@
+ 
+     <dependencyManagement>
+     </dependencyManagement>
+-</project>
++</project>
+\ No newline at end of file
